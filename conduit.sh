@@ -1741,9 +1741,21 @@ is_mtproto_running() {
     docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^mtproto-proxy$"
 }
 
+get_public_ip() {
+    local _ip _url
+    for _url in "https://api.ipify.org" "https://ifconfig.me" "https://icanhazip.com"; do
+        _ip=$(curl -4 -s --max-time 5 "$_url" 2>/dev/null | tr -d '[:space:]')
+        if echo "$_ip" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "$_ip"
+            return 0
+        fi
+    done
+    return 1
+}
+
 get_mtproto_link() {
     local _mt_ip
-    _mt_ip=$(curl -4 -s --max-time 5 ifconfig.me 2>/dev/null)
+    _mt_ip=$(get_public_ip)
     if [ -z "$_mt_ip" ]; then
         echo "Could not detect server IP."
         return 1
@@ -1768,7 +1780,7 @@ show_mtproto_status() {
     fi
     if is_mtproto_running; then
         local _mt_ip
-        _mt_ip=$(curl -4 -s --max-time 5 ifconfig.me 2>/dev/null)
+        _mt_ip=$(get_public_ip)
         [ -n "$_mt_ip" ] && echo -e "  Link:    tg://proxy?server=${_mt_ip}&port=${MTPROTO_PORT}&secret=${MTPROTO_SECRET}"
     fi
 }
@@ -1796,7 +1808,7 @@ show_mtproto_menu() {
             echo -e "  Traffic:     ↓ $(format_bytes ${_mt_dl:-0})  ↑ $(format_bytes ${_mt_ul:-0})"
             if is_mtproto_running; then
                 local _mt_ip
-                _mt_ip=$(curl -4 -s --max-time 5 ifconfig.me 2>/dev/null)
+                _mt_ip=$(get_public_ip)
                 if [ -n "$_mt_ip" ]; then
                     echo ""
                     echo -e "  ${BOLD}Share link:${NC}"
@@ -1901,7 +1913,7 @@ show_mtproto_menu() {
                 7)
                     echo ""
                     local _mt_ip
-                    _mt_ip=$(curl -4 -s --max-time 5 ifconfig.me 2>/dev/null)
+                    _mt_ip=$(get_public_ip)
                     if [ -n "$_mt_ip" ]; then
                         local _mt_link="tg://proxy?server=${_mt_ip}&port=${MTPROTO_PORT}&secret=${MTPROTO_SECRET}"
                         echo -e "  ${BOLD}Share this link with Telegram users:${NC}"
@@ -1924,7 +1936,7 @@ show_mtproto_menu() {
                         echo -e "  ${DIM}Enable it in Settings → t. Telegram notifications${NC}"
                     else
                         local _mt_ip
-                        _mt_ip=$(curl -4 -s --max-time 5 ifconfig.me 2>/dev/null)
+                        _mt_ip=$(get_public_ip)
                         if [ -n "$_mt_ip" ]; then
                             local _mt_link="tg://proxy?server=${_mt_ip}&port=${MTPROTO_PORT}&secret=${MTPROTO_SECRET}"
                             echo -e "  Sending to Telegram..."
@@ -2080,7 +2092,7 @@ Domain: ${MTPROTO_DOMAIN}
                             echo -e "  ${GREEN}✓ MTProto proxy enabled and running!${NC}"
                             echo ""
                             local _mt_ip
-                            _mt_ip=$(curl -4 -s --max-time 5 ifconfig.me 2>/dev/null)
+                            _mt_ip=$(get_public_ip)
                             if [ -n "$_mt_ip" ]; then
                                 local _mt_link="tg://proxy?server=${_mt_ip}&port=${MTPROTO_PORT}&secret=${MTPROTO_SECRET}"
                                 echo -e "  ${BOLD}Share link:${NC}"
@@ -6227,7 +6239,7 @@ telegram_send_message() {
     # Prepend server label + IP (escape for Markdown)
     local label="${TELEGRAM_SERVER_LABEL:-$(hostname 2>/dev/null || echo 'unknown')}"
     label=$(escape_telegram_markdown "$label")
-    local _ip=$(curl -s --max-time 3 https://api.ipify.org 2>/dev/null || echo "")
+    local _ip=$(get_public_ip)
     if [ -n "$_ip" ]; then
         message="[${label} | ${_ip}] ${message}"
     else
@@ -6567,9 +6579,12 @@ INSTALL_DIR="/opt/conduit"
 [ -z "$TELEGRAM_CHAT_ID" ] && exit 0
 
 # Cache server IP once at startup
-_server_ip=$(curl -s --max-time 5 https://api.ipify.org 2>/dev/null \
-    || curl -s --max-time 5 https://ifconfig.me 2>/dev/null \
-    || echo "")
+_server_ip=""
+for _ip_url in "https://api.ipify.org" "https://ifconfig.me" "https://icanhazip.com"; do
+    _server_ip=$(curl -4 -s --max-time 5 "$_ip_url" 2>/dev/null | tr -d '[:space:]')
+    echo "$_server_ip" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' && break
+    _server_ip=""
+done
 
 telegram_send() {
     local message="$1"
@@ -7606,7 +7621,7 @@ Instances: ${_sf_count}"
                     telegram_send "❌ MTProto proxy is not configured."
                 else
                     local _mt_ip
-                    _mt_ip=$(curl -4 -s --max-time 5 ifconfig.me 2>/dev/null)
+                    _mt_ip=$(get_public_ip)
                     if [ -z "$_mt_ip" ]; then
                         telegram_send "❌ Could not detect server IP."
                     else
