@@ -2037,6 +2037,9 @@ Domain: ${MTPROTO_DOMAIN}
                 1)
                     echo ""
                     local new_port new_domain
+                    echo -e "  ${DIM}Tip: The port you choose must be open on your firewall/security group.${NC}"
+                    echo -e "  ${DIM}If running at home, you'll need to port-forward it on your router.${NC}"
+                    echo ""
                     read -p "  Port to listen on [443]: " new_port < /dev/tty || true
                     new_port="${new_port:-443}"
                     if ! echo "$new_port" | grep -qE '^[0-9]+$' || [ "$new_port" -lt 1 ] || [ "$new_port" -gt 65535 ] 2>/dev/null; then
