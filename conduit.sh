@@ -1829,6 +1829,9 @@ show_mtproto_menu() {
                 fi
             fi
             echo ""
+            echo -e "  ${DIM}Tip: Port ${MTPROTO_PORT:-443} must be open on your firewall/security group.${NC}"
+            echo -e "  ${DIM}If running at home, port-forward ${MTPROTO_PORT:-443} on your router.${NC}"
+            echo ""
             echo "  Options:"
             echo "    1. Start"
             echo "    2. Stop"
@@ -14940,7 +14943,11 @@ print_summary() {
 #═══════════════════════════════════════════════════════════════════════
 
 uninstall() {
-    telegram_disable_service
+    # Stop and disable telegram service (inline — function is inside MANAGEMENT heredoc)
+    if command -v systemctl &>/dev/null && [ -f /etc/systemd/system/conduit-telegram.service ]; then
+        systemctl stop conduit-telegram.service 2>/dev/null || true
+        systemctl disable conduit-telegram.service 2>/dev/null || true
+    fi
     rm -f /etc/systemd/system/conduit-telegram.service 2>/dev/null
     systemctl daemon-reload 2>/dev/null || true
     echo ""
