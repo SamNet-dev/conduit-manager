@@ -10,7 +10,7 @@
                       M A N A G E R
 ```
 
-![Version](https://img.shields.io/badge/version-1.3.1-blue)
+![Version](https://img.shields.io/badge/version-1.3.3-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-Linux-orange)
 ![Docker](https://img.shields.io/badge/Docker-Required-2496ED?logo=docker&logoColor=white)
@@ -24,9 +24,17 @@ A powerful management tool for deploying and managing Psiphon Conduit nodes on L
 |:-:|:-:|
 | ![Main Menu](screenshots/conduit-menu.png) | ![Live Stats](screenshots/conduit-stats.png) |
 
-| Live Map | Advanced Stats |
+| Live Peers | Advanced Stats |
 |:-:|:-:|
-| ![Live Map](screenshots/conduit-live-map.png) | ![Advanced Stats](screenshots/conduit-advanced-stats.png) |
+| ![Live Peers](screenshots/conduit-live-map.png) | ![Advanced Stats](screenshots/conduit-advanced-stats.png) |
+
+| Iran Connectivity Status | Iran Connectivity Test |
+|:-:|:-:|
+| ![Iran Connectivity](screenshots/conduit-iranstats.png) | ![Iran Test](screenshots/conduit-irantest.png) |
+
+| Psiphon Network Stats | Info & Help |
+|:-:|:-:|
+| ![Psiphon Stats](screenshots/network-stats.png) | ![Info & Help](screenshots/conduit-info.png) |
 
 ## Quick Install
 
@@ -41,7 +49,17 @@ wget https://raw.githubusercontent.com/SamNet-dev/conduit-manager/main/conduit.s
 sudo bash conduit.sh
 ```
 
-## What's New in v1.3.1
+## What's New in v1.3.3
+
+- **Iran Connectivity Status** — Real-time Iran internet monitoring dashboard with data from IODA (BGP reachability), OONI (censorship detection), irinter.net (connectivity score), and optional Cloudflare Radar. Auto-refresh every hour with 7-day charts, outage alerts, and circumvention tool reachability (Psiphon, Tor)
+- **Iran Connectivity Test** — Comprehensive network diagnostics testing 88 servers across 24 Iranian cities. Includes Quick Test (latency to all servers), Full Report (detailed per-server analysis with quality grading), Stability Test (multi-round jitter analysis), and MTU Path Discovery (binary search across 10 networks)
+- **Psiphon Network Stats** — Global Psiphon network analytics with daily connected users, bytes transferred, running proxies, and country distribution charts with vertical bar graphs and horizontal bar rankings
+- **Dual Status Indicator** — Iran status page shows both irinter.net connectivity percentage and IODA BGP reachability score simultaneously with independent color coding
+- **Smart Quality Scoring** — Tiered latency penalty system for accurate quality grades: A+ to F based on reachability, latency, and consistency with thresholds tuned for international testing
+- **MTU Path Discovery** — Network path MTU detection using binary search with Don't Fragment flag across 8 Iranian ISPs and 2 international endpoints
+- **24-City Iran Coverage** — Expanded from 18 to 24 cities with 88 test servers covering Tehran, Isfahan, Tabriz, Shiraz, Mashhad, Ahvaz, Kerman, Rasht, Yazd, Qom, Karaj, Arak, Gorgan, Sari, Zahedan, Zanjan, Bushehr, Khorramabad, Hamadan, Qazvin, Urmia, Sanandaj, Bandar Abbas, and Kermanshah
+
+### v1.3.1
 
 - **Telegram MTProto Proxy** — Built-in MTProto proxy (mtg v2) with fake-TLS, share link & QR code, send to Telegram bot, resource configuration, and traffic monitoring
 - **Auto-Update Checker** — Background version check with update badge on menu, optional automatic updates every 48h via cron
@@ -66,26 +84,40 @@ sudo bash conduit.sh
 
 ## Features
 
+### Data Analytics & Network Intelligence
+- **Iran Connectivity Status** — Real-time internet monitoring with IODA BGP reachability, OONI censorship data, irinter.net connectivity score, and optional Cloudflare Radar traffic metrics. 7-day charts, outage alerts, and circumvention tool success rates with auto-refresh
+- **Iran Connectivity Test** — Network diagnostics suite with 88 servers across 24 Iranian cities. Quick Test (parallel latency scan), Full Report (per-server quality grades A+ to F), Stability Test (multi-round jitter analysis), and MTU Path Discovery (binary search across 10 networks)
+- **Psiphon Network Stats** — Global Psiphon network analytics dashboard with daily connected users, bytes transferred, running proxies, and country distribution. Vertical bar charts for 30-day trends and horizontal bar rankings for top regions
+- **Advanced Stats** — Top countries by connected peers, download, upload, and unique IPs with bar charts
+- **Live Peer Traffic** — Real-time traffic table by country with speed, total bytes, and IP/client counts
+
+### Core Management
 - **One-Click Deployment** — Automatically installs Docker and configures everything
 - **Scalable Containers** — Run unlimited containers based on your server's capacity
 - **Multi-Distro Support** — Works on Ubuntu, Debian, CentOS, Fedora, Arch, Alpine, openSUSE
 - **Auto-Start on Boot** — Supports systemd, OpenRC, and SysVinit
-- **Snowflake Proxy** — Built-in Tor Snowflake proxy with dual-instance support and resource management
-- **MTProto Proxy** — Telegram MTProto proxy (mtg v2) with fake-TLS, share link, QR code, and Telegram delivery
-- **Auto-Update** — Background version check with update badge, optional automatic updates every 48h via cron
-- **Multi-Server Dashboard** — Manage up to 30 remote servers from one TUI with live refresh, pagination, and bulk actions
-- **Remote Server Management** — SSH key and encrypted password authentication with ControlMaster persistent connections
-- **Live Dashboard** — Real-time stats with peak, average, CPU/RAM, temperature, and per-country breakdown
-- **Connection History** — Track client counts over time with 6h, 12h, 24h snapshots
-- **Advanced Stats** — Top countries by connected peers, download, upload, and unique IPs with bar charts
-- **Live Peer Traffic** — Real-time traffic table by country with speed, total bytes, and IP/client counts
-- **Background Tracker** — 24/7 traffic and connection monitoring via systemd service with GeoIP resolution
-- **Telegram Bot** — On-demand `/status`, `/peers`, `/uptime`, `/containers` and remote container management via Telegram with inline keyboards and QR delivery
 - **Per-Container Settings** — Configure max-clients, bandwidth, CPU, and memory per container
 - **Resource Limits** — Set CPU and memory limits with smart defaults based on system specs
 - **Easy Management** — Powerful CLI commands or interactive menu
 - **Backup & Restore** — Backup and restore your node identity keys
+
+### Privacy & Circumvention Tools
+- **Snowflake Proxy** — Built-in Tor Snowflake proxy with dual-instance support and resource management
+- **MTProto Proxy** — Telegram MTProto proxy (mtg v2) with fake-TLS, share link, QR code, and Telegram delivery
+
+### Multi-Server & Remote Management
+- **Multi-Server Dashboard** — Manage up to 30 remote servers from one TUI with live refresh, pagination, and bulk actions
+- **Remote Server Management** — SSH key and encrypted password authentication with ControlMaster persistent connections
+
+### Monitoring & Notifications
+- **Live Dashboard** — Real-time stats with peak, average, CPU/RAM, temperature, and per-country breakdown
+- **Connection History** — Track client counts over time with 6h, 12h, 24h snapshots
+- **Background Tracker** — 24/7 traffic and connection monitoring via systemd service with GeoIP resolution
+- **Auto-Update** — Background version check with update badge, optional automatic updates every 48h via cron
+- **Telegram Bot** — On-demand `/status`, `/peers`, `/uptime`, `/containers` and remote container management via Telegram with inline keyboards and QR delivery
 - **Health Checks** — Comprehensive diagnostics for troubleshooting
+
+### Info & Safety
 - **Info & Help** — Built-in guides covering traffic, stats, Snowflake proxy, and safety & legal information
 - **Safety & Legal Info** — Built-in pages explaining the legal protections and safety of running a node
 - **Complete Uninstall** — Clean removal of all components including Telegram service
@@ -119,6 +151,14 @@ conduit stats        # View live statistics (real-time dashboard)
 conduit logs         # View raw Docker logs
 conduit health       # Run health check diagnostics
 conduit peers        # Live peer traffic by country (GeoIP)
+conduit dashboard    # Multi-server management dashboard
+```
+
+### Data Analytics
+```bash
+conduit iran-status  # Iran internet connectivity status (IODA, OONI, irinter.net)
+conduit iran-test    # Iran connectivity test across 88 servers in 24 cities
+conduit psiphon-stats # Global Psiphon network analytics
 ```
 
 ### Rewards
@@ -133,6 +173,14 @@ conduit stop         # Stop all Conduit containers
 conduit restart      # Restart all Conduit containers
 conduit update       # Update script + Docker images (with auto-update toggle)
 conduit mtproto      # Manage MTProto proxy (status|start|stop|restart|remove)
+conduit snowflake    # Manage Snowflake proxy (status|start|stop|restart|remove)
+```
+
+### Server Management
+```bash
+conduit servers      # List configured remote servers
+conduit add-server   # Add a remote server
+conduit remove-server # Remove a remote server
 ```
 
 ### Configuration
@@ -151,6 +199,7 @@ conduit restore      # Restore node identity from backup
 ```bash
 conduit uninstall    # Remove all components
 conduit version      # Show version information
+conduit update-geoip # Update GeoIP database
 conduit help         # Show help message
 ```
 
@@ -170,9 +219,13 @@ The interactive menu (`conduit menu`) provides access to all features:
 | **8** | Update Conduit — script + Docker images, auto-update toggle |
 | **9** | Settings & Tools — resource limits, QR code, backup, restore, health check, Telegram, uninstall |
 | **c** | Manage containers — add or remove containers (up to 5) |
-| **s** | Snowflake proxy — status, start/stop, resource configuration |
-| **p** | Telegram MTProto Proxy — setup, share link & QR, send to Telegram, resource config |
 | **a** | Advanced stats — top 5 charts for peers, download, upload, unique IPs |
+| **m** | Multi-server dashboard — manage up to 30 remote servers with live status |
+| **f** | Snowflake proxy — status, start/stop, resource configuration |
+| **p** | Telegram MTProto Proxy — setup, share link & QR, send to Telegram, resource config |
+| **n** | Psiphon Network Stats — global network analytics with charts and country rankings |
+| **e** | Iran Connectivity Status — real-time internet monitoring with IODA, OONI, irinter.net data |
+| **t** | Iran Connectivity Test — network diagnostics across 88 servers in 24 Iranian cities |
 | **i** | Info & Help — multi-page guide explaining traffic, network, stats, peak/avg/history |
 | **0** | Exit |
 
@@ -269,9 +322,17 @@ Conduit node operators can earn OAT tokens for contributing to the Psiphon netwo
 |:-:|:-:|
 | ![منوی اصلی](screenshots/conduit-menu.png) | ![آمار زنده](screenshots/conduit-stats.png) |
 
-| نقشه زنده | آمار پیشرفته |
+| ترافیک زنده | آمار پیشرفته |
 |:-:|:-:|
-| ![نقشه زنده](screenshots/conduit-live-map.png) | ![آمار پیشرفته](screenshots/conduit-advanced-stats.png) |
+| ![ترافیک زنده](screenshots/conduit-live-map.png) | ![آمار پیشرفته](screenshots/conduit-advanced-stats.png) |
+
+| وضعیت اتصال ایران | تست اتصال ایران |
+|:-:|:-:|
+| ![وضعیت اتصال](screenshots/conduit-iranstats.png) | ![تست اتصال](screenshots/conduit-irantest.png) |
+
+| آمار شبکه سایفون | راهنما |
+|:-:|:-:|
+| ![آمار سایفون](screenshots/network-stats.png) | ![راهنما](screenshots/conduit-info.png) |
 
 ## نصب سریع
 
@@ -288,7 +349,17 @@ wget https://raw.githubusercontent.com/SamNet-dev/conduit-manager/main/conduit.s
 sudo bash conduit.sh
 ```
 
-## تازه‌های نسخه 1.3.1
+## تازه‌های نسخه 1.3.3
+
+- **وضعیت اتصال ایران** — داشبورد مانیتورینگ لحظه‌ای اینترنت ایران با داده‌های IODA (دسترسی BGP)، OONI (تشخیص سانسور)، irinter.net (امتیاز اتصال) و Cloudflare Radar اختیاری. نمودارهای ۷ روزه، هشدارهای قطعی و نرخ موفقیت ابزارهای دور زدن (سایفون، تور) با بروزرسانی خودکار
+- **تست اتصال ایران** — مجموعه تشخیص شبکه با ۸۸ سرور در ۲۴ شهر ایران. شامل تست سریع (اسکن موازی تاخیر)، گزارش کامل (رتبه‌بندی کیفیت A+ تا F هر سرور)، تست پایداری (تحلیل جیتر چند مرحله‌ای) و کشف MTU مسیر (جستجوی دودویی در ۱۰ شبکه)
+- **آمار شبکه سایفون** — داشبورد تحلیلی شبکه جهانی سایفون با کاربران روزانه، حجم انتقال داده، پروکسی‌های فعال و توزیع کشوری. نمودارهای میله‌ای عمودی برای روند ۳۰ روزه و رتبه‌بندی افقی مناطق برتر
+- **نشانگر دوگانه وضعیت** — صفحه وضعیت ایران همزمان درصد اتصال irinter.net و امتیاز دسترسی BGP از IODA را با کدگذاری رنگی مستقل نمایش می‌دهد
+- **امتیازدهی هوشمند کیفیت** — سیستم جریمه تاخیر مرحله‌ای برای رتبه‌بندی دقیق کیفیت: A+ تا F بر اساس دسترسی، تاخیر و پایداری
+- **کشف MTU مسیر** — تشخیص MTU مسیر شبکه با جستجوی دودویی و پرچم Don't Fragment در ۸ ISP ایرانی و ۲ نقطه بین‌المللی
+- **پوشش ۲۴ شهر ایران** — گسترش از ۱۸ به ۲۴ شهر با ۸۸ سرور تست شامل تهران، اصفهان، تبریز، شیراز، مشهد، اهواز، کرمان، رشت، یزد، قم، کرج، اراک، گرگان، ساری، زاهدان، زنجان، بوشهر، خرم‌آباد، همدان، قزوین، ارومیه، سنندج، بندرعباس و کرمانشاه
+
+### نسخه 1.3.1
 
 - **پروکسی MTProto تلگرام** — پروکسی MTProto (mtg v2) با fake-TLS، لینک اشتراک‌گذاری و QR کد، ارسال به ربات تلگرام، پیکربندی منابع و مانیتورینگ ترافیک
 - **بررسی خودکار به‌روزرسانی** — بررسی نسخه در پس‌زمینه با نشان به‌روزرسانی در منو، به‌روزرسانی خودکار اختیاری هر ۴۸ ساعت
@@ -312,26 +383,40 @@ sudo bash conduit.sh
 
 ## ویژگی‌ها
 
+### تحلیل داده و هوش شبکه
+- **وضعیت اتصال ایران** — مانیتورینگ لحظه‌ای اینترنت با داده‌های IODA (دسترسی BGP)، OONI (تشخیص سانسور)، irinter.net (امتیاز اتصال) و Cloudflare Radar اختیاری. نمودارهای ۷ روزه، هشدارهای قطعی و نرخ موفقیت ابزارهای دور زدن فیلترینگ با بروزرسانی خودکار
+- **تست اتصال ایران** — مجموعه تشخیص شبکه با ۸۸ سرور در ۲۴ شهر ایران. تست سریع (اسکن موازی)، گزارش کامل (رتبه‌بندی A+ تا F)، تست پایداری (تحلیل جیتر) و کشف MTU مسیر (جستجوی دودویی در ۱۰ شبکه)
+- **آمار شبکه سایفون** — داشبورد تحلیلی شبکه جهانی سایفون با کاربران روزانه، حجم داده، پروکسی‌های فعال و توزیع کشوری با نمودارهای میله‌ای عمودی و افقی
+- **آمار پیشرفته** — نمودار میله‌ای برترین کشورها بر اساس اتصال، دانلود، آپلود و IP
+- **مانیتورینگ ترافیک** — جدول لحظه‌ای ترافیک بر اساس کشور با سرعت و تعداد کلاینت
+
+### مدیریت اصلی
 - **نصب با یک کلیک** — داکر و تمام موارد مورد نیاز به صورت خودکار نصب می‌شود
 - **مقیاس‌پذیری نامحدود** — اجرای کانتینرهای نامحدود بر اساس ظرفیت سرور
 - **پشتیبانی از توزیع‌های مختلف** — اوبونتو، دبیان، سنت‌اواس، فدورا، آرچ، آلپاین، اوپن‌سوزه
 - **راه‌اندازی خودکار** — پس از ریستارت سرور، سرویس به صورت خودکار اجرا می‌شود
-- **پروکسی اسنوفلیک** — پروکسی Snowflake تور با پشتیبانی دو نمونه و مدیریت منابع
-- **پروکسی MTProto** — پروکسی MTProto تلگرام (mtg v2) با fake-TLS، لینک اشتراک‌گذاری، QR کد و ارسال به تلگرام
-- **به‌روزرسانی خودکار** — بررسی نسخه در پس‌زمینه با نشان به‌روزرسانی، به‌روزرسانی خودکار اختیاری هر ۴۸ ساعت
-- **داشبورد چند سرور** — مدیریت تا ۳۰ سرور ریموت با رفرش زنده، صفحه‌بندی و عملیات گروهی
-- **مدیریت سرور ریموت** — احراز هویت کلید SSH و رمز عبور رمزنگاری‌شده با اتصال پایدار ControlMaster
-- **داشبورد زنده** — نمایش لحظه‌ای پیک، میانگین، CPU، RAM، دما و تفکیک کشوری
-- **تاریخچه اتصال** — ردیابی تعداد کلاینت‌ها با اسنپ‌شات ۶، ۱۲ و ۲۴ ساعته
-- **آمار پیشرفته** — نمودار میله‌ای برترین کشورها بر اساس اتصال، دانلود، آپلود و IP
-- **مانیتورینگ ترافیک** — جدول لحظه‌ای ترافیک بر اساس کشور با سرعت و تعداد کلاینت
-- **ردیاب پس‌زمینه** — سرویس ردیابی ۲۴/۷ ترافیک و اتصالات با تشخیص جغرافیایی
-- **ربات تلگرام** — دستورات `/status`، `/peers`، `/uptime`، `/containers` و مدیریت کانتینر از راه دور با دکمه‌های اینلاین و ارسال QR کد
 - **تنظیمات هر کانتینر** — پیکربندی حداکثر کاربران، پهنای باند، CPU و حافظه برای هر کانتینر
 - **محدودیت منابع** — تنظیم محدودیت CPU و حافظه با پیش‌فرض‌های هوشمند
 - **مدیریت آسان** — دستورات قدرتمند CLI یا منوی تعاملی
 - **پشتیبان‌گیری و بازیابی** — پشتیبان‌گیری و بازیابی کلیدهای هویت نود
+
+### ابزارهای حریم خصوصی و دور زدن فیلترینگ
+- **پروکسی اسنوفلیک** — پروکسی Snowflake تور با پشتیبانی دو نمونه و مدیریت منابع
+- **پروکسی MTProto** — پروکسی MTProto تلگرام (mtg v2) با fake-TLS، لینک اشتراک‌گذاری، QR کد و ارسال به تلگرام
+
+### مدیریت چند سرور و ریموت
+- **داشبورد چند سرور** — مدیریت تا ۳۰ سرور ریموت با رفرش زنده، صفحه‌بندی و عملیات گروهی
+- **مدیریت سرور ریموت** — احراز هویت کلید SSH و رمز عبور رمزنگاری‌شده با اتصال پایدار ControlMaster
+
+### مانیتورینگ و اعلان‌ها
+- **داشبورد زنده** — نمایش لحظه‌ای پیک، میانگین، CPU، RAM، دما و تفکیک کشوری
+- **تاریخچه اتصال** — ردیابی تعداد کلاینت‌ها با اسنپ‌شات ۶، ۱۲ و ۲۴ ساعته
+- **ردیاب پس‌زمینه** — سرویس ردیابی ۲۴/۷ ترافیک و اتصالات با تشخیص جغرافیایی
+- **به‌روزرسانی خودکار** — بررسی نسخه در پس‌زمینه با نشان به‌روزرسانی، به‌روزرسانی خودکار اختیاری هر ۴۸ ساعت
+- **ربات تلگرام** — دستورات `/status`، `/peers`، `/uptime`، `/containers` و مدیریت کانتینر از راه دور با دکمه‌های اینلاین و ارسال QR کد
 - **بررسی سلامت** — تشخیص جامع برای عیب‌یابی
+
+### اطلاعات و ایمنی
 - **راهنما و اطلاعات** — راهنمای چندصفحه‌ای شامل ترافیک، آمار، پروکسی اسنوفلیک و اطلاعات ایمنی و حقوقی
 - **اطلاعات ایمنی و حقوقی** — صفحات توضیح حفاظت قانونی و ایمنی اجرای نود
 - **حذف کامل** — پاکسازی تمام فایل‌ها و تنظیمات شامل سرویس تلگرام
@@ -353,6 +438,14 @@ conduit stats        # داشبورد زنده (لحظه‌ای)
 conduit logs         # لاگ‌های داکر
 conduit health       # بررسی سلامت سیستم
 conduit peers        # ترافیک بر اساس کشور (GeoIP)
+conduit dashboard    # داشبورد مدیریت چند سرور
+```
+
+### تحلیل داده
+```bash
+conduit iran-status  # وضعیت اتصال اینترنت ایران (IODA، OONI، irinter.net)
+conduit iran-test    # تست اتصال ایران در ۸۸ سرور ۲۴ شهر
+conduit psiphon-stats # آمار شبکه جهانی سایفون
 ```
 
 ### پاداش
@@ -367,6 +460,14 @@ conduit stop         # توقف تمام کانتینرها
 conduit restart      # ریستارت تمام کانتینرها
 conduit update       # به‌روزرسانی اسکریپت + ایمیج‌های داکر (با تنظیم به‌روزرسانی خودکار)
 conduit mtproto      # مدیریت پروکسی MTProto (وضعیت|شروع|توقف|ریستارت|حذف)
+conduit snowflake    # مدیریت پروکسی اسنوفلیک (وضعیت|شروع|توقف|ریستارت|حذف)
+```
+
+### مدیریت سرور
+```bash
+conduit servers      # لیست سرورهای ریموت
+conduit add-server   # اضافه کردن سرور ریموت
+conduit remove-server # حذف سرور ریموت
 ```
 
 ### پیکربندی
@@ -385,6 +486,7 @@ conduit restore      # بازیابی کلیدهای نود از پشتیبان
 ```bash
 conduit uninstall    # حذف کامل
 conduit version      # نمایش نسخه
+conduit update-geoip # به‌روزرسانی پایگاه داده GeoIP
 conduit help         # راهنما
 ```
 
@@ -402,9 +504,13 @@ conduit help         # راهنما
 | **8** | به‌روزرسانی — اسکریپت + ایمیج‌های داکر، تنظیم به‌روزرسانی خودکار |
 | **9** | تنظیمات و ابزارها — محدودیت منابع، QR کد، پشتیبان‌گیری، بازیابی، تلگرام، حذف نصب |
 | **c** | مدیریت کانتینرها — اضافه یا حذف (تا ۵) |
-| **s** | پروکسی اسنوفلیک — وضعیت، شروع/توقف، پیکربندی منابع |
-| **p** | پروکسی MTProto تلگرام — راه‌اندازی، اشتراک لینک و QR، ارسال به تلگرام |
 | **a** | آمار پیشرفته — نمودار برترین کشورها |
+| **m** | داشبورد چند سرور — مدیریت تا ۳۰ سرور ریموت با وضعیت زنده |
+| **f** | پروکسی اسنوفلیک — وضعیت، شروع/توقف، پیکربندی منابع |
+| **p** | پروکسی MTProto تلگرام — راه‌اندازی، اشتراک لینک و QR، ارسال به تلگرام |
+| **n** | آمار شبکه سایفون — تحلیل شبکه جهانی با نمودار و رتبه‌بندی کشوری |
+| **e** | وضعیت اتصال ایران — مانیتورینگ لحظه‌ای با داده‌های IODA، OONI و irinter.net |
+| **t** | تست اتصال ایران — تشخیص شبکه در ۸۸ سرور ۲۴ شهر ایران |
 | **i** | راهنما — توضیحات ترافیک، شبکه، آمار، پیک/میانگین/تاریخچه |
 | **0** | خروج |
 
