@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # ╔═══════════════════════════════════════════════════════════════════╗
-# ║     🚀 PSIPHON CONDUIT MANAGER v1.3.1                             ║
+# ║     🚀 PSIPHON CONDUIT MANAGER v1.3.3                             ║
 # ║                                                                   ║
 # ║  One-click setup for Psiphon Conduit                              ║
 # ║                                                                   ║
@@ -31,7 +31,7 @@ if [ -z "$BASH_VERSION" ]; then
     exit 1
 fi
 
-VERSION="1.3.1"
+VERSION="1.3.3"
 CONDUIT_IMAGE="ghcr.io/ssmirr/conduit/conduit:latest"
 INSTALL_DIR="${INSTALL_DIR:-/opt/conduit}"
 BACKUP_DIR="$INSTALL_DIR/backups"
@@ -290,6 +290,10 @@ check_dependencies() {
 
     if ! command -v qrencode &>/dev/null; then
         install_package qrencode || log_warn "Could not install qrencode automatically"
+    fi
+
+    if ! command -v openssl &>/dev/null; then
+        install_package openssl || log_warn "Could not install openssl (needed for credential encryption)"
     fi
 }
 
@@ -742,8 +746,9 @@ save_settings_install() {
     mkdir -p "$INSTALL_DIR"
     # Preserve existing Telegram settings on reinstall
     local _tg_token="" _tg_chat="" _tg_interval="6" _tg_enabled="false"
-    local _tg_alerts="true" _tg_daily="true" _tg_weekly="true" _tg_label="" _tg_start_hour="0"
+    local _tg_alerts="true" _tg_cpu_alert="true" _tg_daily="true" _tg_weekly="true" _tg_label="" _tg_start_hour="0"
     local _sf_enabled="false" _sf_count="1" _sf_cpus="" _sf_memory=""
+    local _mt_enabled="false" _mt_port="443" _mt_secret="" _mt_domain="google.com" _mt_cpus="" _mt_memory=""
     local _dc_gb="0" _dc_up="0" _dc_down="0" _dc_iface=""
     local _dc_base_rx="0" _dc_base_tx="0" _dc_prior="0" _dc_prior_rx="0" _dc_prior_tx="0"
     local _dk_cpus="" _dk_memory="" _tracker="true"
@@ -784,41 +789,41 @@ save_settings_install() {
     fi
     local _tmp="$INSTALL_DIR/settings.conf.tmp.$$"
     cat > "$_tmp" << EOF
-MAX_CLIENTS=$MAX_CLIENTS
-BANDWIDTH=$BANDWIDTH
-CONTAINER_COUNT=${CONTAINER_COUNT:-1}
-DATA_CAP_GB=$_dc_gb
-DATA_CAP_UP_GB=$_dc_up
-DATA_CAP_DOWN_GB=$_dc_down
-DATA_CAP_IFACE=$_dc_iface
-DATA_CAP_BASELINE_RX=$_dc_base_rx
-DATA_CAP_BASELINE_TX=$_dc_base_tx
-DATA_CAP_PRIOR_USAGE=$_dc_prior
-DATA_CAP_PRIOR_RX=$_dc_prior_rx
-DATA_CAP_PRIOR_TX=$_dc_prior_tx
-DOCKER_CPUS=$_dk_cpus
-DOCKER_MEMORY=$_dk_memory
-TRACKER_ENABLED=$_tracker
-SNOWFLAKE_ENABLED=$_sf_enabled
-SNOWFLAKE_COUNT=$_sf_count
-SNOWFLAKE_CPUS=$_sf_cpus
-SNOWFLAKE_MEMORY=$_sf_memory
-MTPROTO_ENABLED=$_mt_enabled
-MTPROTO_PORT=$_mt_port
+MAX_CLIENTS="$MAX_CLIENTS"
+BANDWIDTH="$BANDWIDTH"
+CONTAINER_COUNT="${CONTAINER_COUNT:-1}"
+DATA_CAP_GB="$_dc_gb"
+DATA_CAP_UP_GB="$_dc_up"
+DATA_CAP_DOWN_GB="$_dc_down"
+DATA_CAP_IFACE="$_dc_iface"
+DATA_CAP_BASELINE_RX="$_dc_base_rx"
+DATA_CAP_BASELINE_TX="$_dc_base_tx"
+DATA_CAP_PRIOR_USAGE="$_dc_prior"
+DATA_CAP_PRIOR_RX="$_dc_prior_rx"
+DATA_CAP_PRIOR_TX="$_dc_prior_tx"
+DOCKER_CPUS="$_dk_cpus"
+DOCKER_MEMORY="$_dk_memory"
+TRACKER_ENABLED="$_tracker"
+SNOWFLAKE_ENABLED="$_sf_enabled"
+SNOWFLAKE_COUNT="$_sf_count"
+SNOWFLAKE_CPUS="$_sf_cpus"
+SNOWFLAKE_MEMORY="$_sf_memory"
+MTPROTO_ENABLED="$_mt_enabled"
+MTPROTO_PORT="$_mt_port"
 MTPROTO_SECRET="$_mt_secret"
-MTPROTO_DOMAIN=$_mt_domain
-MTPROTO_CPUS=$_mt_cpus
-MTPROTO_MEMORY=$_mt_memory
+MTPROTO_DOMAIN="$_mt_domain"
+MTPROTO_CPUS="$_mt_cpus"
+MTPROTO_MEMORY="$_mt_memory"
 TELEGRAM_BOT_TOKEN="$_tg_token"
 TELEGRAM_CHAT_ID="$_tg_chat"
-TELEGRAM_INTERVAL=$_tg_interval
-TELEGRAM_ENABLED=$_tg_enabled
-TELEGRAM_ALERTS_ENABLED=$_tg_alerts
-TELEGRAM_CPU_ALERT=$_tg_cpu_alert
-TELEGRAM_DAILY_SUMMARY=$_tg_daily
-TELEGRAM_WEEKLY_SUMMARY=$_tg_weekly
+TELEGRAM_INTERVAL="$_tg_interval"
+TELEGRAM_ENABLED="$_tg_enabled"
+TELEGRAM_ALERTS_ENABLED="$_tg_alerts"
+TELEGRAM_CPU_ALERT="$_tg_cpu_alert"
+TELEGRAM_DAILY_SUMMARY="$_tg_daily"
+TELEGRAM_WEEKLY_SUMMARY="$_tg_weekly"
 TELEGRAM_SERVER_LABEL="${_tg_label//\"/}"
-TELEGRAM_START_HOUR=$_tg_start_hour
+TELEGRAM_START_HOUR="$_tg_start_hour"
 EOF
     chmod 600 "$_tmp" 2>/dev/null || true
     mv "$_tmp" "$INSTALL_DIR/settings.conf"
@@ -942,7 +947,7 @@ create_management_script() {
 # Reference: https://github.com/ssmirr/conduit/releases/latest
 #
 
-VERSION="1.3.1"
+VERSION="1.3.3"
 INSTALL_DIR="REPLACE_ME_INSTALL_DIR"
 BACKUP_DIR="$INSTALL_DIR/backups"
 CONDUIT_IMAGE="ghcr.io/ssmirr/conduit/conduit:latest"
@@ -953,15 +958,20 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 MAGENTA='\033[0;35m'
+BLUE='\033[0;34m'
 BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m'
 
-# Load settings
-[ -f "$INSTALL_DIR/settings.conf" ] && source "$INSTALL_DIR/settings.conf"
+# Load settings (enforce permissions on sensitive config files)
+if [ -f "$INSTALL_DIR/settings.conf" ]; then
+    chmod 600 "$INSTALL_DIR/settings.conf" 2>/dev/null || true
+    source "$INSTALL_DIR/settings.conf"
+fi
 MAX_CLIENTS=${MAX_CLIENTS:-200}
 BANDWIDTH=${BANDWIDTH:-5}
 CONTAINER_COUNT=${CONTAINER_COUNT:-1}
+PERSIST_DIR="$INSTALL_DIR/traffic_stats"
 DATA_CAP_GB=${DATA_CAP_GB:-0}
 DATA_CAP_UP_GB=${DATA_CAP_UP_GB:-0}
 DATA_CAP_DOWN_GB=${DATA_CAP_DOWN_GB:-0}
@@ -1603,13 +1613,16 @@ run_mtproto_container() {
     # Save traffic before removing existing container
     save_mtproto_traffic
 
-    # Remove existing container
-    docker rm -f "mtproto-proxy" >/dev/null 2>&1 || true
-
-    # Pull image if not available locally
+    # Pull image if not available locally (before destroying old container)
     if ! docker image inspect "$MTPROTO_IMAGE" >/dev/null 2>&1; then
-        docker pull "$MTPROTO_IMAGE" 2>/dev/null || true
+        if ! docker pull "$MTPROTO_IMAGE" 2>/dev/null; then
+            echo -e "  ${RED}✗ Failed to pull MTProto image. Existing proxy left running.${NC}"
+            return 1
+        fi
     fi
+
+    # Remove existing container (only after confirming image is available)
+    docker rm -f "mtproto-proxy" >/dev/null 2>&1 || true
 
     local actual_cpus=$(LC_ALL=C awk -v req="$mt_cpus" -v cores="$(nproc 2>/dev/null || echo 1)" \
         'BEGIN{c=req+0; if(c>cores+0) c=cores+0; printf "%.2f",c}')
@@ -1944,7 +1957,7 @@ show_mtproto_menu() {
                             if command -v qrencode &>/dev/null; then
                                 qrencode -t PNG -o /tmp/mtproto_share_qr.png "$_mt_link" 2>/dev/null
                                 if [ -f /tmp/mtproto_share_qr.png ]; then
-                                    local _tg_caption="📡 *MTProto Proxy*"
+                                    local _tg_caption="✉️ *MTProto Proxy*"
                                     _tg_caption+=$'\n'"Server: \`${_mt_ip}\`"
                                     _tg_caption+=$'\n'"Port: ${MTPROTO_PORT}"
                                     _tg_caption+=$'\n'"Domain: ${MTPROTO_DOMAIN}"
@@ -1958,7 +1971,7 @@ show_mtproto_menu() {
                                     rm -f /tmp/mtproto_share_qr.png
                                     echo -e "  ${GREEN}✓ Link and QR code sent to Telegram${NC}"
                                 else
-                                    telegram_send_message "📡 *MTProto Proxy*
+                                    telegram_send_message "✉️ *MTProto Proxy*
 Server: \`${_mt_ip}\`
 Port: ${MTPROTO_PORT}
 Domain: ${MTPROTO_DOMAIN}
@@ -1967,7 +1980,7 @@ Domain: ${MTPROTO_DOMAIN}
                                     echo -e "  ${GREEN}✓ Link sent to Telegram${NC}"
                                 fi
                             else
-                                telegram_send_message "📡 *MTProto Proxy*
+                                telegram_send_message "✉️ *MTProto Proxy*
 Server: \`${_mt_ip}\`
 Port: ${MTPROTO_PORT}
 Domain: ${MTPROTO_DOMAIN}
@@ -2264,7 +2277,7 @@ show_qr_code() {
 
 show_dashboard() {
     local stop_dashboard=0
-    trap 'stop_dashboard=1' SIGINT SIGTERM
+    trap 'stop_dashboard=1' SIGINT SIGTERM SIGHUP SIGQUIT
     tput smcup 2>/dev/null || true
     echo -ne "\033[?25l"
     clear
@@ -2408,7 +2421,7 @@ show_dashboard() {
     echo -ne "\033[?25h" # Show cursor
     # Restore main screen buffer
     tput rmcup 2>/dev/null || true
-    trap - SIGINT SIGTERM # Reset traps
+    trap - SIGINT SIGTERM SIGHUP SIGQUIT
 }
 
 get_container_stats() {
@@ -3007,7 +3020,7 @@ check_stuck_containers() {
             if docker restart "$cname" >/dev/null 2>&1; then
                 CONTAINER_LAST_RESTART[$cname]=$now
                 CONTAINER_LAST_ACTIVE[$cname]=$now
-                if [ "$TELEGRAM_ENABLED" = "true" ] && [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
+                if [ "${TELEGRAM_ENABLED:-false}" = "true" ] && [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
                     local _msg="⚠️ *Conduit Alert*
 Container \`${cname}\` was stuck (no peers for $((idle_time/3600))h) and has been auto\\-restarted\\."
                     curl -s --max-time 10 -X POST \
@@ -3183,8 +3196,8 @@ show_advanced_stats() {
     fi
 
     local persist_dir="$INSTALL_DIR/traffic_stats"
-    local exit_stats=0
-    trap 'exit_stats=1' SIGINT SIGTERM
+    local exit_stats=0 _adv_tmpdir=""
+    trap 'exit_stats=1; [ -n "$_adv_tmpdir" ] && rm -rf "$_adv_tmpdir"' SIGINT SIGTERM SIGHUP SIGQUIT
 
     local L="══════════════════════════════════════════════════════════════"
     local D="──────────────────────────────────────────────────────────────"
@@ -3350,7 +3363,7 @@ show_advanced_stats() {
             echo -e "${CYAN}╠─── ${CYAN}TOP 5 BY UNIQUE IPs${NC} ${DIM}(tracked)${NC}\033[K"
             local total_traffic=$((total_in + total_out))
             if [ "$total_conn" -gt 0 ] && [ "$total_active" -gt 0 ]; then
-                for c in "${!cips[@]}"; do echo "${cips[$c]}|$c"; done | sort -t'|' -k1 -nr | head -7 | while IFS='|' read -r active_cnt country; do
+                for c in "${!cips[@]}"; do echo "${cips[$c]}|$c"; done | sort -t'|' -k1 -nr | head -5 | while IFS='|' read -r active_cnt country; do
                     local peers=$(( (active_cnt * total_conn) / total_active ))
                     [ "$peers" -eq 0 ] && [ "$active_cnt" -gt 0 ] && peers=1
                     local pct=$((peers * 100 / total_conn))
@@ -3362,7 +3375,7 @@ show_advanced_stats() {
                 for c in "${!cbw_in[@]}"; do
                     local bytes=$(( ${cbw_in[$c]:-0} + ${cbw_out[$c]:-0} ))
                     echo "${bytes}|$c"
-                done | sort -t'|' -k1 -nr | head -7 | while IFS='|' read -r bytes country; do
+                done | sort -t'|' -k1 -nr | head -5 | while IFS='|' read -r bytes country; do
                     local pct=$((bytes * 100 / total_traffic))
                     local blen=$((pct / 8)); [ "$blen" -lt 1 ] && blen=1; [ "$blen" -gt 14 ] && blen=14
                     local bfill=$(printf '%*s' "$blen" '' | sed 's/ /█/g')
@@ -3375,7 +3388,7 @@ show_advanced_stats() {
             # TOP 5 by Download
             echo -e "${CYAN}╠─── ${GREEN}TOP 5 BY DOWNLOAD${NC} ${DIM}(inbound traffic)${NC}\033[K"
             if [ "$total_in" -gt 0 ]; then
-                for c in "${!cbw_in[@]}"; do echo "${cbw_in[$c]}|$c"; done | sort -t'|' -k1 -nr | head -7 | while IFS='|' read -r bytes country; do
+                for c in "${!cbw_in[@]}"; do echo "${cbw_in[$c]}|$c"; done | sort -t'|' -k1 -nr | head -5 | while IFS='|' read -r bytes country; do
                     local pct=$((bytes * 100 / total_in))
                     local blen=$((pct / 8)); [ "$blen" -lt 1 ] && blen=1; [ "$blen" -gt 14 ] && blen=14
                     local bfill=$(printf '%*s' "$blen" '' | sed 's/ /█/g')
@@ -3388,7 +3401,7 @@ show_advanced_stats() {
             # TOP 5 by Upload
             echo -e "${CYAN}╠─── ${YELLOW}TOP 5 BY UPLOAD${NC} ${DIM}(outbound traffic)${NC}\033[K"
             if [ "$total_out" -gt 0 ]; then
-                for c in "${!cbw_out[@]}"; do echo "${cbw_out[$c]}|$c"; done | sort -t'|' -k1 -nr | head -7 | while IFS='|' read -r bytes country; do
+                for c in "${!cbw_out[@]}"; do echo "${cbw_out[$c]}|$c"; done | sort -t'|' -k1 -nr | head -5 | while IFS='|' read -r bytes country; do
                     local pct=$((bytes * 100 / total_out))
                     local blen=$((pct / 8)); [ "$blen" -lt 1 ] && blen=1; [ "$blen" -gt 14 ] && blen=14
                     local bfill=$(printf '%*s' "$blen" '' | sed 's/ /█/g')
@@ -3415,7 +3428,7 @@ show_advanced_stats() {
 
     echo -ne "\033[?25h"
     tput rmcup 2>/dev/null || true
-    trap - SIGINT SIGTERM
+    trap - SIGINT SIGTERM SIGHUP SIGQUIT
 }
 
 show_peers() {
@@ -3431,7 +3444,7 @@ show_peers() {
     fi
 
     local stop_peers=0
-    trap 'stop_peers=1' SIGINT SIGTERM
+    trap 'stop_peers=1' SIGINT SIGTERM SIGHUP SIGQUIT
 
     local persist_dir="$INSTALL_DIR/traffic_stats"
 
@@ -3607,7 +3620,7 @@ show_peers() {
     echo -ne "\033[?25h"
     tput rmcup 2>/dev/null || true
     rm -f /tmp/conduit_peers_sorted
-    trap - SIGINT SIGTERM
+    trap - SIGINT SIGTERM SIGHUP SIGQUIT
 }
 
 get_net_speed() {
@@ -3617,13 +3630,13 @@ get_net_speed() {
     [ -z "$iface" ] && iface=$(ip route list default 2>/dev/null | awk '/dev/{for(i=1;i<=NF;i++)if($i=="dev"){print $(i+1);exit}}')
     
     if [ -n "$iface" ] && [ -f "/sys/class/net/$iface/statistics/rx_bytes" ]; then
-        local rx1=$(cat /sys/class/net/$iface/statistics/rx_bytes)
-        local tx1=$(cat /sys/class/net/$iface/statistics/tx_bytes)
-        
+        local rx1=$(cat "/sys/class/net/$iface/statistics/rx_bytes")
+        local tx1=$(cat "/sys/class/net/$iface/statistics/tx_bytes")
+
         sleep 0.5
-        
-        local rx2=$(cat /sys/class/net/$iface/statistics/rx_bytes)
-        local tx2=$(cat /sys/class/net/$iface/statistics/tx_bytes)
+
+        local rx2=$(cat "/sys/class/net/$iface/statistics/rx_bytes")
+        local tx2=$(cat "/sys/class/net/$iface/statistics/tx_bytes")
         
         # Calculate Delta (Bytes)
         local rx_delta=$((rx2 - rx1))
@@ -4133,7 +4146,7 @@ status_json() {
             local logs=$(cat "$_jt/logs_$i")
             if [ -n "$logs" ]; then
                 local conn cing up_b down_b
-                IFS='|' read -r cing conn up_b down_b _ <<< $(echo "$logs" | awk '{
+                IFS='|' read -r cing conn up_b down_b _ <<< "$(echo "$logs" | awk '{
                     ci=0; co=0; up=""; down=""
                     for(j=1;j<=NF;j++){
                         if($j=="Connecting:") ci=$(j+1)+0
@@ -4142,7 +4155,7 @@ status_json() {
                         else if($j=="Down:"){for(k=j+1;k<=NF;k++){if($k=="|"||$k~/Uptime:/)break; down=down (down?" ":"") $k}}
                     }
                     printf "%d|%d|%s|%s|", ci, co, up, down
-                }')
+                }')"
                 total_conn=$((total_conn + ${conn:-0}))
                 total_cing=$((total_cing + ${cing:-0}))
                 # Convert upload to bytes
@@ -4319,7 +4332,7 @@ show_status() {
         if [ "${_c_running[$i]}" = true ] && [ -f "$_st_tmpdir/logs_${i}" ]; then
             local logs=$(cat "$_st_tmpdir/logs_${i}")
             if [ -n "$logs" ]; then
-                IFS='|' read -r c_connecting c_connected c_up_val c_down_val c_uptime_val <<< $(echo "$logs" | awk '{
+                IFS='|' read -r c_connecting c_connected c_up_val c_down_val c_uptime_val <<< "$(echo "$logs" | awk '{
                     cing=0; conn=0; up=""; down=""; ut=""
                     for(j=1;j<=NF;j++){
                         if($j=="Connecting:") cing=$(j+1)+0
@@ -4329,7 +4342,7 @@ show_status() {
                         else if($j=="Uptime:"){for(k=j+1;k<=NF;k++){ut=ut (ut?" ":"") $k}}
                     }
                     printf "%d|%d|%s|%s|%s", cing, conn, up, down, ut
-                }')
+                }')"
                 _c_conn[$i]="${c_connected:-0}"
                 _c_cing[$i]="${c_connecting:-0}"
                 _c_up[$i]="${c_up_val}"
@@ -4488,7 +4501,7 @@ show_status() {
             echo -e "${CYAN}═══ Traffic (current session) ═══${NC}${EL}"
             # Record connection history (every 5 min) — only if tracker is not running
             # to avoid double entries and race conditions on the history file
-            if ! systemctl is-active conduit-tracker.service &>/dev/null 2>&1; then
+            if ! systemctl is-active conduit-tracker.service &>/dev/null; then
                 record_connection_history "$connected" "$connecting"
             fi
             # Get connection history snapshots (single-pass read)
@@ -4692,10 +4705,12 @@ start_conduit() {
     # Batch: get all existing containers in one docker call
     local existing_containers=$(docker ps -a --format '{{.Names}}' 2>/dev/null)
     local running_containers=$(docker ps --format '{{.Names}}' 2>/dev/null)
+    local _start_failures=0
 
     for i in $(seq 1 $CONTAINER_COUNT); do
         local name=$(get_container_name $i)
         local vol=$(get_volume_name $i)
+        local _rc=0
 
         if echo "$running_containers" | grep -q "^${name}$"; then
             # Already running — skip
@@ -4731,21 +4746,25 @@ start_conduit() {
                 docker volume create "$vol" >/dev/null 2>&1 || true
                 fix_volume_permissions $i
                 run_conduit_container $i
+                _rc=$?
             else
                 # Settings unchanged — just resume the stopped container
                 docker start "$name" >/dev/null 2>&1
+                _rc=$?
             fi
         else
             # Container doesn't exist — create fresh
             docker volume create "$vol" >/dev/null 2>&1 || true
             fix_volume_permissions $i
             run_conduit_container $i
+            _rc=$?
         fi
 
-        if [ $? -eq 0 ]; then
+        if [ $_rc -eq 0 ]; then
             echo -e "${GREEN}✓ ${name} started${NC}"
         else
             echo -e "${RED}✗ Failed to start ${name}${NC}"
+            _start_failures=$((_start_failures + 1))
         fi
     done
     # Start background tracker
@@ -4754,6 +4773,7 @@ start_conduit() {
     [ "$SNOWFLAKE_ENABLED" = "true" ] && start_snowflake 2>/dev/null
     # Start mtproto if enabled
     [ "$MTPROTO_ENABLED" = "true" ] && start_mtproto 2>/dev/null
+    [ "$_start_failures" -gt 0 ] && return 1
     return 0
 }
 
@@ -4774,20 +4794,15 @@ stop_conduit() {
         fi
     done
     # Stop extra containers from previous scaling
-    local base_name="$(get_container_name 1)"
-    local idx
-    docker ps -a --format '{{.Names}}' 2>/dev/null | while read -r cname; do
-        case "$cname" in
-            "${base_name%1}"*)
-                idx="${cname##*[!0-9]}"
-                if [[ "$idx" =~ ^[0-9]+$ ]] && [ "$idx" -gt "$CONTAINER_COUNT" ]; then
-                    docker stop "$cname" 2>/dev/null || true
-                    docker rm "$cname" 2>/dev/null || true
-                    echo -e "${YELLOW}✓ ${cname} stopped and removed (extra)${NC}"
-                fi
-                ;;
-        esac
-    done
+    while read -r cname; do
+        [[ "$cname" =~ ^conduit(-([0-9]+))?$ ]] || continue
+        local idx="${BASH_REMATCH[2]:-1}"
+        if [ "$idx" -gt "$CONTAINER_COUNT" ]; then
+            docker stop "$cname" 2>/dev/null || true
+            docker rm "$cname" 2>/dev/null || true
+            echo -e "${YELLOW}✓ ${cname} stopped and removed (extra)${NC}"
+        fi
+    done < <(docker ps -a --format '{{.Names}}' 2>/dev/null)
     [ "$stopped" -eq 0 ] && echo -e "${YELLOW}No Conduit containers are running${NC}"
     [ "$SNOWFLAKE_ENABLED" = "true" ] && stop_snowflake 2>/dev/null
     [ "$MTPROTO_ENABLED" = "true" ] && stop_mtproto 2>/dev/null
@@ -4915,7 +4930,7 @@ restart_conduit() {
         fi
     done
     # Remove extra containers beyond current count (dynamic, no hard max)
-    docker ps -a --format '{{.Names}}' 2>/dev/null | while read -r cname; do
+    while read -r cname; do
         [[ "$cname" =~ ^conduit(-([0-9]+))?$ ]] || continue
         local idx="${BASH_REMATCH[2]:-1}"
         if [ "$idx" -gt "$CONTAINER_COUNT" ]; then
@@ -4923,7 +4938,7 @@ restart_conduit() {
             docker rm "$cname" 2>/dev/null || true
             echo -e "${YELLOW}✓ ${cname} removed (scaled down)${NC}"
         fi
-    done
+    done < <(docker ps -a --format '{{.Names}}' 2>/dev/null)
     # Stop tracker before backup to avoid racing with writes
     stop_tracker_service 2>/dev/null || true
     local persist_dir="$INSTALL_DIR/traffic_stats"
@@ -5041,10 +5056,10 @@ change_settings() {
         # Apply to specific container
         local idx=${targets[0]}
         if [ -n "$valid_mc" ]; then
-            eval "MAX_CLIENTS_${idx}=${valid_mc}"
+            printf -v "MAX_CLIENTS_${idx}" '%s' "$valid_mc"
         fi
         if [ -n "$valid_bw" ]; then
-            eval "BANDWIDTH_${idx}=${valid_bw}"
+            printf -v "BANDWIDTH_${idx}" '%s' "$valid_bw"
         fi
     fi
 
@@ -5225,8 +5240,8 @@ change_resource_limits() {
         done
     else
         local idx=${targets[0]}
-        [ -n "$valid_cpus" ] && eval "CPUS_${idx}=${valid_cpus}"
-        [ -n "$valid_mem" ] && eval "MEMORY_${idx}=${valid_mem}"
+        [ -n "$valid_cpus" ] && printf -v "CPUS_${idx}" '%s' "$valid_cpus"
+        [ -n "$valid_mem" ] && printf -v "MEMORY_${idx}" '%s' "$valid_mem"
     fi
 
     save_settings
@@ -5443,8 +5458,8 @@ uninstall_all() {
 }
 
 manage_containers() {
-    local stop_manage=0
-    trap 'stop_manage=1' SIGINT SIGTERM
+    local stop_manage=0 _mc_tmpdir=""
+    trap 'stop_manage=1; [ -n "$_mc_tmpdir" ] && rm -rf "$_mc_tmpdir"' SIGINT SIGTERM SIGHUP SIGQUIT
 
     # Calculate recommendation (1 container per core, limited by RAM)
     local cpu_cores=$(nproc 2>/dev/null || grep -c ^processor /proc/cpuinfo 2>/dev/null || echo 1)
@@ -5478,6 +5493,7 @@ manage_containers() {
         local docker_ps_cache=$(docker ps --format '{{.Names}}' 2>/dev/null)
 
         # Collect all docker data in parallel using a temp dir
+        [ -n "$_mc_tmpdir" ] && rm -rf "$_mc_tmpdir"
         local _mc_tmpdir=$(mktemp -d /tmp/.conduit_mc.XXXXXX)
         # mktemp already created the directory
 
@@ -5514,7 +5530,7 @@ manage_containers() {
                     local logs=""
                     [ -f "$_mc_tmpdir/logs_${ci}" ] && logs=$(cat "$_mc_tmpdir/logs_${ci}")
                     if [ -n "$logs" ]; then
-                        IFS='|' read -r conn cing mc_up mc_down <<< $(echo "$logs" | awk '{
+                        IFS='|' read -r conn cing mc_up mc_down <<< "$(echo "$logs" | awk '{
                             cing=0; conn=0; up=""; down=""
                             for(j=1;j<=NF;j++){
                                 if($j=="Connecting:") cing=$(j+1)+0
@@ -5523,7 +5539,7 @@ manage_containers() {
                                 else if($j=="Down:"){for(k=j+1;k<=NF;k++){if($k=="|"||$k~/Uptime:/)break; down=down (down?" ":"") $k}}
                             }
                             printf "%d|%d|%s|%s", conn, cing, up, down
-                        }')
+                        }')"
                         c_clients="${conn:-0}/${cing:-0}"
                         c_up="${mc_up:-"-"}"
                         c_down="${mc_down:-"-"}"
@@ -5688,8 +5704,8 @@ manage_containers() {
                     fi
                     # Save per-container overrides for new containers
                     for i in $(seq $((old_count + 1)) $CONTAINER_COUNT); do
-                        [ -n "$new_cpus" ] && eval "CPUS_${i}=${new_cpus}"
-                        [ -n "$new_mem" ] && eval "MEMORY_${i}=${new_mem}"
+                        [ -n "$new_cpus" ] && printf -v "CPUS_${i}" '%s' "$new_cpus"
+                        [ -n "$new_mem" ] && printf -v "MEMORY_${i}" '%s' "$new_mem"
                     done
                 fi
 
@@ -5942,7 +5958,7 @@ manage_containers() {
     done
     echo -ne "\033[?25h"
     tput rmcup 2>/dev/null || true
-    trap - SIGINT SIGTERM
+    trap - SIGINT SIGTERM SIGHUP SIGQUIT
 }
 
 # Get default network interface
@@ -5961,8 +5977,8 @@ get_data_usage() {
     fi
     local rx=$(cat /sys/class/net/$iface/statistics/rx_bytes 2>/dev/null || echo 0)
     local tx=$(cat /sys/class/net/$iface/statistics/tx_bytes 2>/dev/null || echo 0)
-    local used_rx=$((rx - DATA_CAP_BASELINE_RX))
-    local used_tx=$((tx - DATA_CAP_BASELINE_TX))
+    local used_rx=$((rx - ${DATA_CAP_BASELINE_RX:-0}))
+    local used_tx=$((tx - ${DATA_CAP_BASELINE_TX:-0}))
     # Handle counter reset (reboot)
     if [ "$used_rx" -lt 0 ] || [ "$used_tx" -lt 0 ]; then
         DATA_CAP_BASELINE_RX=$rx
@@ -6169,41 +6185,41 @@ set_data_cap() {
 save_settings() {
     local _tmp="$INSTALL_DIR/settings.conf.tmp.$$"
     cat > "$_tmp" << EOF
-MAX_CLIENTS=$MAX_CLIENTS
-BANDWIDTH=$BANDWIDTH
-CONTAINER_COUNT=$CONTAINER_COUNT
-DATA_CAP_GB=$DATA_CAP_GB
-DATA_CAP_UP_GB=$DATA_CAP_UP_GB
-DATA_CAP_DOWN_GB=$DATA_CAP_DOWN_GB
-DATA_CAP_IFACE=$DATA_CAP_IFACE
-DATA_CAP_BASELINE_RX=$DATA_CAP_BASELINE_RX
-DATA_CAP_BASELINE_TX=$DATA_CAP_BASELINE_TX
-DATA_CAP_PRIOR_USAGE=${DATA_CAP_PRIOR_USAGE:-0}
-DATA_CAP_PRIOR_RX=${DATA_CAP_PRIOR_RX:-0}
-DATA_CAP_PRIOR_TX=${DATA_CAP_PRIOR_TX:-0}
+MAX_CLIENTS="$MAX_CLIENTS"
+BANDWIDTH="$BANDWIDTH"
+CONTAINER_COUNT="$CONTAINER_COUNT"
+DATA_CAP_GB="$DATA_CAP_GB"
+DATA_CAP_UP_GB="$DATA_CAP_UP_GB"
+DATA_CAP_DOWN_GB="$DATA_CAP_DOWN_GB"
+DATA_CAP_IFACE="$DATA_CAP_IFACE"
+DATA_CAP_BASELINE_RX="$DATA_CAP_BASELINE_RX"
+DATA_CAP_BASELINE_TX="$DATA_CAP_BASELINE_TX"
+DATA_CAP_PRIOR_USAGE="${DATA_CAP_PRIOR_USAGE:-0}"
+DATA_CAP_PRIOR_RX="${DATA_CAP_PRIOR_RX:-0}"
+DATA_CAP_PRIOR_TX="${DATA_CAP_PRIOR_TX:-0}"
 TELEGRAM_BOT_TOKEN="$TELEGRAM_BOT_TOKEN"
 TELEGRAM_CHAT_ID="$TELEGRAM_CHAT_ID"
-TELEGRAM_INTERVAL=${TELEGRAM_INTERVAL:-6}
-TELEGRAM_ENABLED=${TELEGRAM_ENABLED:-false}
-TELEGRAM_ALERTS_ENABLED=${TELEGRAM_ALERTS_ENABLED:-true}
-TELEGRAM_CPU_ALERT=${TELEGRAM_CPU_ALERT:-true}
-TELEGRAM_DAILY_SUMMARY=${TELEGRAM_DAILY_SUMMARY:-true}
-TELEGRAM_WEEKLY_SUMMARY=${TELEGRAM_WEEKLY_SUMMARY:-true}
+TELEGRAM_INTERVAL="${TELEGRAM_INTERVAL:-6}"
+TELEGRAM_ENABLED="${TELEGRAM_ENABLED:-false}"
+TELEGRAM_ALERTS_ENABLED="${TELEGRAM_ALERTS_ENABLED:-true}"
+TELEGRAM_CPU_ALERT="${TELEGRAM_CPU_ALERT:-true}"
+TELEGRAM_DAILY_SUMMARY="${TELEGRAM_DAILY_SUMMARY:-true}"
+TELEGRAM_WEEKLY_SUMMARY="${TELEGRAM_WEEKLY_SUMMARY:-true}"
 TELEGRAM_SERVER_LABEL="${TELEGRAM_SERVER_LABEL:-}"
-TELEGRAM_START_HOUR=${TELEGRAM_START_HOUR:-0}
-DOCKER_CPUS=${DOCKER_CPUS:-}
-DOCKER_MEMORY=${DOCKER_MEMORY:-}
-TRACKER_ENABLED=${TRACKER_ENABLED:-true}
-SNOWFLAKE_ENABLED=${SNOWFLAKE_ENABLED:-false}
-SNOWFLAKE_COUNT=${SNOWFLAKE_COUNT:-1}
-SNOWFLAKE_CPUS=${SNOWFLAKE_CPUS:-}
-SNOWFLAKE_MEMORY=${SNOWFLAKE_MEMORY:-}
-MTPROTO_ENABLED=${MTPROTO_ENABLED:-false}
-MTPROTO_PORT=${MTPROTO_PORT:-443}
+TELEGRAM_START_HOUR="${TELEGRAM_START_HOUR:-0}"
+DOCKER_CPUS="${DOCKER_CPUS:-}"
+DOCKER_MEMORY="${DOCKER_MEMORY:-}"
+TRACKER_ENABLED="${TRACKER_ENABLED:-true}"
+SNOWFLAKE_ENABLED="${SNOWFLAKE_ENABLED:-false}"
+SNOWFLAKE_COUNT="${SNOWFLAKE_COUNT:-1}"
+SNOWFLAKE_CPUS="${SNOWFLAKE_CPUS:-}"
+SNOWFLAKE_MEMORY="${SNOWFLAKE_MEMORY:-}"
+MTPROTO_ENABLED="${MTPROTO_ENABLED:-false}"
+MTPROTO_PORT="${MTPROTO_PORT:-443}"
 MTPROTO_SECRET="${MTPROTO_SECRET:-}"
-MTPROTO_DOMAIN=${MTPROTO_DOMAIN:-google.com}
-MTPROTO_CPUS=${MTPROTO_CPUS:-}
-MTPROTO_MEMORY=${MTPROTO_MEMORY:-}
+MTPROTO_DOMAIN="${MTPROTO_DOMAIN:-google.com}"
+MTPROTO_CPUS="${MTPROTO_CPUS:-}"
+MTPROTO_MEMORY="${MTPROTO_MEMORY:-}"
 EOF
     # Save per-container overrides
     for i in $(seq 1 "$CONTAINER_COUNT"); do
@@ -6211,12 +6227,17 @@ EOF
         local bw_var="BANDWIDTH_${i}"
         local cpu_var="CPUS_${i}"
         local mem_var="MEMORY_${i}"
-        [ -n "${!mc_var}" ] && echo "${mc_var}=${!mc_var}" >> "$_tmp"
-        [ -n "${!bw_var}" ] && echo "${bw_var}=${!bw_var}" >> "$_tmp"
-        [ -n "${!cpu_var}" ] && echo "${cpu_var}=${!cpu_var}" >> "$_tmp"
-        [ -n "${!mem_var}" ] && echo "${mem_var}=${!mem_var}" >> "$_tmp"
+        [ -n "${!mc_var}" ] && echo "${mc_var}=\"${!mc_var}\"" >> "$_tmp"
+        [ -n "${!bw_var}" ] && echo "${bw_var}=\"${!bw_var}\"" >> "$_tmp"
+        [ -n "${!cpu_var}" ] && echo "${cpu_var}=\"${!cpu_var}\"" >> "$_tmp"
+        [ -n "${!mem_var}" ] && echo "${mem_var}=\"${!mem_var}\"" >> "$_tmp"
     done
     chmod 600 "$_tmp" 2>/dev/null || true
+    if [ ! -s "$_tmp" ]; then
+        echo -e "  ${RED}✗ Settings file is empty (disk full?). Keeping existing config.${NC}" >&2
+        rm -f "$_tmp"
+        return 1
+    fi
     mv "$_tmp" "$INSTALL_DIR/settings.conf"
 }
 
@@ -6230,7 +6251,7 @@ escape_telegram_markdown() {
     text="${text//\`/\\\`}"
     text="${text//\[/\\[}"
     text="${text//\]/\\]}"
-    echo "$text"
+    printf '%s\n' "$text"
 }
 
 telegram_send_message() {
@@ -6336,7 +6357,7 @@ telegram_build_report() {
     report+=$'\n'
     report+=$'\n'
 
-    local running_count=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -c "^conduit" 2>/dev/null || true)
+    local running_count=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -cE "^conduit(-[0-9]+)?$" 2>/dev/null || true)
     running_count=${running_count:-0}
     local total=$CONTAINER_COUNT
     if [ "$running_count" -gt 0 ]; then
@@ -6477,7 +6498,7 @@ telegram_build_report() {
         read -r _mt_dl _mt_ul <<< "$_mt_t"
         local mt_dl_fmt=$(format_bytes ${_mt_dl:-0})
         local mt_ul_fmt=$(format_bytes ${_mt_ul:-0})
-        report+="📡 MTProxy: Running | ↓${mt_dl_fmt} ↑${mt_ul_fmt}"
+        report+="✉️ MTProxy: Running | ↓${mt_dl_fmt} ↑${mt_ul_fmt}"
         report+=$'\n'
     fi
 
@@ -6586,6 +6607,135 @@ for _ip_url in "https://api.ipify.org" "https://ifconfig.me" "https://icanhazip.
     _server_ip=""
 done
 
+PERSIST_DIR="$INSTALL_DIR/traffic_stats"
+
+# --- Helper functions (not available from management.sh in standalone mode) ---
+
+get_public_ip() {
+    [ -n "$_server_ip" ] && { echo "$_server_ip"; return 0; }
+    local _ip _url
+    for _url in "https://api.ipify.org" "https://ifconfig.me" "https://icanhazip.com"; do
+        _ip=$(curl -4 -s --max-time 5 "$_url" 2>/dev/null | tr -d '[:space:]')
+        echo "$_ip" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' && { echo "$_ip"; return 0; }
+    done
+    return 1
+}
+
+get_snowflake_name() {
+    local idx=${1:-1}
+    [ "$idx" -le 1 ] 2>/dev/null && echo "snowflake-proxy" || echo "snowflake-proxy-${idx}"
+}
+
+is_snowflake_running() {
+    local i
+    for i in $(seq 1 ${SNOWFLAKE_COUNT:-1}); do
+        docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^$(get_snowflake_name $i)$" && return 0
+    done
+    return 1
+}
+
+start_snowflake() {
+    [ -f "$PERSIST_DIR/data_cap_exceeded" ] && return 1
+    local i cname
+    for i in $(seq 1 ${SNOWFLAKE_COUNT:-1}); do
+        cname=$(get_snowflake_name $i)
+        docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^${cname}$" && continue
+        docker start "$cname" >/dev/null 2>&1 || true
+    done
+}
+
+stop_snowflake() {
+    local i
+    for i in $(seq 1 ${SNOWFLAKE_COUNT:-1}); do
+        docker stop --timeout 10 "$(get_snowflake_name $i)" 2>/dev/null || true
+    done
+}
+
+restart_snowflake() {
+    [ -f "$PERSIST_DIR/data_cap_exceeded" ] && return 1
+    local i
+    for i in $(seq 1 ${SNOWFLAKE_COUNT:-1}); do
+        docker restart "$(get_snowflake_name $i)" >/dev/null 2>&1 || true
+    done
+}
+
+is_mtproto_running() {
+    docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^mtproto-proxy$"
+}
+
+start_mtproto() {
+    [ -f "$PERSIST_DIR/data_cap_exceeded" ] && return 1
+    [ -z "$MTPROTO_SECRET" ] && return 1
+    docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^mtproto-proxy$" && return 0
+    docker start "mtproto-proxy" >/dev/null 2>&1
+}
+
+get_mtproto_stats() {
+    is_mtproto_running || { echo "0 0"; return; }
+    local metrics
+    metrics=$(curl -s --max-time 2 "http://127.0.0.1:${MTPROTO_STATS_PORT:-3129}/" 2>/dev/null)
+    if [ -n "$metrics" ]; then
+        local traffic_in traffic_out
+        traffic_in=$(echo "$metrics" | awk '/^mtg_telegram_traffic\{.*direction="to_client"/ {sum+=$NF} END {printf "%.0f", sum}' 2>/dev/null)
+        traffic_out=$(echo "$metrics" | awk '/^mtg_telegram_traffic\{.*direction="from_client"/ {sum+=$NF} END {printf "%.0f", sum}' 2>/dev/null)
+        echo "${traffic_in:-0} ${traffic_out:-0}"
+        return
+    fi
+    echo "0 0"
+}
+
+get_mtproto_traffic() {
+    local prior_dl=0 prior_ul=0
+    local traffic_file="$PERSIST_DIR/mtproto_traffic"
+    [ -f "$traffic_file" ] && { read -r prior_dl prior_ul < "$traffic_file" 2>/dev/null || true; }
+    local cur_dl=0 cur_ul=0
+    read -r cur_dl cur_ul <<< "$(get_mtproto_stats)"
+    echo "$(( ${prior_dl:-0} + ${cur_dl:-0} )) $(( ${prior_ul:-0} + ${cur_ul:-0} ))"
+}
+
+save_mtproto_traffic() {
+    is_mtproto_running || return
+    local traffic_file="$PERSIST_DIR/mtproto_traffic"
+    local cur_dl=0 cur_ul=0
+    read -r cur_dl cur_ul <<< "$(get_mtproto_stats)"
+    [ "${cur_dl:-0}" -eq 0 ] && [ "${cur_ul:-0}" -eq 0 ] && return
+    local prior_dl=0 prior_ul=0
+    [ -f "$traffic_file" ] && { read -r prior_dl prior_ul < "$traffic_file" 2>/dev/null || true; }
+    echo "$(( ${prior_dl:-0} + ${cur_dl:-0} )) $(( ${prior_ul:-0} + ${cur_ul:-0} ))" > "$traffic_file"
+}
+
+format_bytes() {
+    local bytes=$1
+    [ -z "$bytes" ] || [ "$bytes" -eq 0 ] 2>/dev/null && { echo "0 B"; return; }
+    if [ "$bytes" -ge 1099511627776 ] 2>/dev/null; then
+        awk "BEGIN {printf \"%.2f TB\", $bytes/1099511627776}"
+    elif [ "$bytes" -ge 1073741824 ]; then
+        awk "BEGIN {printf \"%.2f GB\", $bytes/1073741824}"
+    elif [ "$bytes" -ge 1048576 ]; then
+        awk "BEGIN {printf \"%.2f MB\", $bytes/1048576}"
+    elif [ "$bytes" -ge 1024 ]; then
+        awk "BEGIN {printf \"%.2f KB\", $bytes/1024}"
+    else
+        echo "$bytes B"
+    fi
+}
+
+# --- End helper functions ---
+
+# Cache server callback label for multi-server Telegram selection
+_lbl_raw="${TELEGRAM_SERVER_LABEL:-$(hostname 2>/dev/null || echo 'server')}"
+_cb_label=$(echo "$_lbl_raw" | tr -cd 'a-zA-Z0-9_-' | head -c 40)
+[ -z "$_cb_label" ] && _cb_label=$(hostname 2>/dev/null | tr -cd 'a-zA-Z0-9_-' | head -c 40)
+[ -z "$_cb_label" ] && _cb_label="server"
+_lbl_display=$(printf '%s' "$_lbl_raw" | sed 's/\\/\\\\/g; s/"/\\"/g')
+
+# Build server selection inline keyboard
+# Usage: _server_kb "prefix_" "emoji"
+_server_kb() {
+    local prefix="$1" emoji="${2:-🖥}"
+    echo "{\"inline_keyboard\":[[{\"text\":\"${emoji} ${_lbl_display}\",\"callback_data\":\"${prefix}${_cb_label}\"}]]}"
+}
+
 telegram_send() {
     local message="$1"
     # Prepend server label + IP (escape for Markdown)
@@ -6654,7 +6804,7 @@ escape_md() {
     text="${text//\`/\\\`}"
     text="${text//\[/\\[}"
     text="${text//\]/\\]}"
-    echo "$text"
+    printf '%s\n' "$text"
 }
 
 get_container_name() {
@@ -6733,7 +6883,7 @@ get_container_stats() {
     done
     local all_stats=$(timeout 10 docker stats --no-stream --format "{{.CPUPerc}} {{.MemUsage}}" $names 2>/dev/null)
     if [ -z "$all_stats" ]; then
-        echo "0% 0MiB"
+        echo "0% 0MiB / 0MiB"
     elif [ "${CONTAINER_COUNT:-1}" -le 1 ]; then
         echo "$all_stats"
     else
@@ -6753,7 +6903,7 @@ get_container_stats() {
 }
 
 track_uptime() {
-    local running=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -c "^conduit" 2>/dev/null || true)
+    local running=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -cE "^conduit(-[0-9]+)?$" 2>/dev/null || true)
     running=${running:-0}
     echo "$(date +%s)|${running}" >> "$INSTALL_DIR/traffic_stats/uptime_log"
     # Trim to 7 days
@@ -6813,12 +6963,14 @@ check_alerts() {
 
     # System-wide CPU check (from /proc/stat, not Docker containers)
     if [ "${TELEGRAM_CPU_ALERT:-true}" = "true" ] && [ -f /proc/stat ]; then
+        local _c user nice system idle iowait irq softirq steal guest
         read -r _c user nice system idle iowait irq softirq steal guest < /proc/stat
         local total_curr=$((user + nice + system + idle + iowait + irq + softirq + steal))
         local work_curr=$((user + nice + system + irq + softirq + steal))
         local cpu_state="/tmp/conduit_cpu_alert_state"
         local cpu_val=0
         if [ -f "$cpu_state" ]; then
+            local total_prev work_prev
             read -r total_prev work_prev < "$cpu_state"
             local total_delta=$((total_curr - total_prev))
             local work_delta=$((work_curr - work_prev))
@@ -6841,7 +6993,7 @@ System CPU at ${cpu_val}% for 3\\+ minutes"
     fi
 
     # RAM check (from Docker container stats)
-    local conduit_containers=$(docker ps --format '{{.Names}}' 2>/dev/null | grep "^conduit" 2>/dev/null || true)
+    local conduit_containers=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -E "^conduit(-[0-9]+)?$" 2>/dev/null || true)
     local ram_pct=""
     if [ -n "$conduit_containers" ]; then
         ram_pct=$(timeout 10 docker stats --no-stream --format "{{.MemPerc}}" $conduit_containers 2>/dev/null | \
@@ -6862,7 +7014,7 @@ Memory usage at ${ram_pct} for 3\\+ minutes"
     fi
 
     # All containers down
-    local running=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -c "^conduit" 2>/dev/null || true)
+    local running=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -cE "^conduit(-[0-9]+)?$" 2>/dev/null || true)
     running=${running:-0}
     if [ "$running" -eq 0 ] 2>/dev/null && [ $((now - last_alert_down)) -ge $cooldown ] 2>/dev/null; then
         telegram_send "🔴 *Alert: All containers down*
@@ -6893,7 +7045,7 @@ No connected peers for 2\\+ hours"
 }
 
 record_snapshot() {
-    local running=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -c "^conduit" 2>/dev/null || true)
+    local running=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -cE "^conduit(-[0-9]+)?$" 2>/dev/null || true)
     running=${running:-0}
     local total_peers=0
     for i in $(seq 1 ${CONTAINER_COUNT:-1}); do
@@ -7004,6 +7156,7 @@ process_commands() {
 import json, sys
 try:
     data = json.loads(sys.argv[1])
+    allowed_chat = sys.argv[2]
     if not data.get('ok'): sys.exit(0)
     results = data.get('result', [])
     if not results: sys.exit(0)
@@ -7014,7 +7167,7 @@ try:
         if msg:
             chat_id = msg.get('chat', {}).get('id', 0)
             text = msg.get('text', '')
-            if str(chat_id) == '$TELEGRAM_CHAT_ID' and text.startswith('/'):
+            if str(chat_id) == allowed_chat and text.startswith('/'):
                 safe_text = text.split('|')[0].strip()
                 print(f'{uid}|{safe_text}')
             else:
@@ -7026,7 +7179,7 @@ try:
             cb_chat_id = cbq.get('message', {}).get('chat', {}).get('id', 0)
             cb_id = cbq.get('id', '').replace('|', '')
             cb_data = cbq.get('data', '').split('|')[0].strip()
-            if str(cb_chat_id) == '$TELEGRAM_CHAT_ID' and cb_data:
+            if str(cb_chat_id) == allowed_chat and cb_data:
                 print(f'{uid}|callback|{cb_id}|{cb_data}')
             else:
                 print(f'{uid}|')
@@ -7042,7 +7195,7 @@ except Exception:
                 print(f'{max_uid}|')
     except Exception:
         pass
-" "$response" 2>/dev/null)
+" "$response" "$TELEGRAM_CHAT_ID" 2>/dev/null)
 
     [ -z "$parsed" ] && return
 
@@ -7056,127 +7209,15 @@ except Exception:
             local cb_id="$field3"
             local cb_data="$field4"
             case "$cb_data" in
-                mt_start)
-                    telegram_answer_callback "$cb_id" "Starting MTProto..."
-                    if [ "$MTPROTO_ENABLED" = "true" ] && [ -n "$MTPROTO_SECRET" ]; then
-                        start_mtproto >/dev/null 2>&1
-                        if is_mtproto_running; then
-                            telegram_send "🟢 MTProto proxy started."
-                        else
-                            telegram_send "❌ Failed to start MTProto proxy."
-                        fi
-                    else
-                        telegram_send "❌ MTProto not configured."
-                    fi
-                    ;;
-                mt_stop)
-                    telegram_answer_callback "$cb_id" "Stopping MTProto..."
-                    if is_mtproto_running; then
-                        save_mtproto_traffic
-                        docker stop --timeout 10 "mtproto-proxy" >/dev/null 2>&1
-                        telegram_send "🛑 MTProto proxy stopped."
-                    else
-                        telegram_send "ℹ️ MTProto proxy is not running."
-                    fi
-                    ;;
-                mt_restart)
-                    telegram_answer_callback "$cb_id" "Restarting MTProto..."
-                    if [ -f "$PERSIST_DIR/data_cap_exceeded" ]; then
-                        telegram_send "⚠️ Data cap exceeded. MTProto will not restart."
-                    elif [ "$MTPROTO_ENABLED" = "true" ] && [ -n "$MTPROTO_SECRET" ]; then
-                        save_mtproto_traffic
-                        docker restart "mtproto-proxy" >/dev/null 2>&1
-                        if is_mtproto_running; then
-                            telegram_send "🟢 MTProto proxy restarted."
-                        else
-                            telegram_send "❌ Failed to restart MTProto proxy."
-                        fi
-                    else
-                        telegram_send "❌ MTProto not configured."
-                    fi
-                    ;;
-                sf_start)
-                    telegram_answer_callback "$cb_id" "Starting Snowflake..."
-                    if [ "$SNOWFLAKE_ENABLED" = "true" ]; then
-                        start_snowflake >/dev/null 2>&1
-                        if is_snowflake_running; then
-                            telegram_send "🟢 Snowflake proxy started."
-                        else
-                            telegram_send "❌ Failed to start Snowflake proxy."
-                        fi
-                    else
-                        telegram_send "❌ Snowflake not enabled."
-                    fi
-                    ;;
-                sf_stop)
-                    telegram_answer_callback "$cb_id" "Stopping Snowflake..."
-                    if is_snowflake_running; then
-                        stop_snowflake >/dev/null 2>&1
-                        telegram_send "🛑 Snowflake proxy stopped."
-                    else
-                        telegram_send "ℹ️ Snowflake proxy is not running."
-                    fi
-                    ;;
-                sf_restart)
-                    telegram_answer_callback "$cb_id" "Restarting Snowflake..."
-                    if [ "$SNOWFLAKE_ENABLED" = "true" ]; then
-                        restart_snowflake >/dev/null 2>&1
-                        if is_snowflake_running; then
-                            telegram_send "🟢 Snowflake proxy restarted."
-                        else
-                            telegram_send "❌ Failed to restart Snowflake proxy."
-                        fi
-                    else
-                        telegram_send "❌ Snowflake not enabled."
-                    fi
-                    ;;
-                qr_*)
-                    local qr_num="${cb_data#qr_}"
-                    telegram_answer_callback "$cb_id" "Generating QR for container ${qr_num}..."
-                    if [[ "$qr_num" =~ ^[0-9]+$ ]] && [ "$qr_num" -ge 1 ] && [ "$qr_num" -le "${CONTAINER_COUNT:-1}" ]; then
-                        local vol=$(get_volume_name "$qr_num")
-                        local raw_key=$(get_raw_key "$vol")
-                        local node_id=$(get_node_id "$vol")
-                        if [ -n "$raw_key" ] && command -v qrencode &>/dev/null; then
-                            local hostname_str=$(hostname 2>/dev/null || echo "conduit")
-                            local claim_json="{\"version\":1,\"data\":{\"key\":\"${raw_key}\",\"name\":\"${hostname_str}\"}}"
-                            local claim_b64=$(echo -n "$claim_json" | base64 | tr -d '\n')
-                            local claim_url="network.ryve.app://(app)/conduits?claim=${claim_b64}"
-                            qrencode -t PNG -o "/tmp/conduit_qr_${qr_num}.png" "$claim_url" 2>/dev/null
-                            if [ -f "/tmp/conduit_qr_${qr_num}.png" ]; then
-                                telegram_send_photo "/tmp/conduit_qr_${qr_num}.png" "Container ${qr_num} — Conduit ID: ${node_id:-unknown}"
-                                rm -f "/tmp/conduit_qr_${qr_num}.png"
-                            else
-                                telegram_send "❌ Failed to generate QR code for container ${qr_num}"
-                            fi
-                        elif ! command -v qrencode &>/dev/null; then
-                            telegram_send "❌ qrencode not installed. Install with: apt install qrencode"
-                        else
-                            telegram_send "❌ Key not available for container ${qr_num}. Start it first."
-                        fi
-                    else
-                        telegram_answer_callback "$cb_id" "Invalid container"
-                    fi
-                    ;;
                 st_*)
-                    # Only respond if callback matches this server's label
-                    local _lbl="${TELEGRAM_SERVER_LABEL:-$(hostname 2>/dev/null || echo 'server')}"
-                    local _cb_lbl=$(echo "$_lbl" | tr -cd 'a-zA-Z0-9_-' | head -c 50)
-                    [ -z "$_cb_lbl" ] && _cb_lbl=$(hostname 2>/dev/null | tr -cd 'a-zA-Z0-9_-' | head -c 50)
-                    [ -z "$_cb_lbl" ] && _cb_lbl="server"
-                    if [ "$cb_data" = "st_${_cb_lbl}" ]; then
+                    if [ "$cb_data" = "st_${_cb_label}" ]; then
                         telegram_answer_callback "$cb_id" "Fetching status..."
                         local report=$(build_report)
                         telegram_send "$report"
                     fi
                     ;;
                 pr_*)
-                    # Only respond if callback matches this server's label
-                    local _lbl="${TELEGRAM_SERVER_LABEL:-$(hostname 2>/dev/null || echo 'server')}"
-                    local _cb_lbl=$(echo "$_lbl" | tr -cd 'a-zA-Z0-9_-' | head -c 50)
-                    [ -z "$_cb_lbl" ] && _cb_lbl=$(hostname 2>/dev/null | tr -cd 'a-zA-Z0-9_-' | head -c 50)
-                    [ -z "$_cb_lbl" ] && _cb_lbl="server"
-                    if [ "$cb_data" = "pr_${_cb_lbl}" ]; then
+                    if [ "$cb_data" = "pr_${_cb_label}" ]; then
                         telegram_answer_callback "$cb_id" "Fetching peers..."
                         local total_peers=0
                         local total_cing=0
@@ -7191,6 +7232,575 @@ except Exception:
                         telegram_send "👥 Clients: ${total_peers} connected, ${total_cing} connecting"
                     fi
                     ;;
+                ut_*)
+                    if [ "$cb_data" = "ut_${_cb_label}" ]; then
+                        telegram_answer_callback "$cb_id" "Fetching uptime..."
+                        local ut_msg="⏱ *Uptime Report*"
+                        ut_msg+=$'\n'
+                        for i in $(seq 1 ${CONTAINER_COUNT:-1}); do
+                            local cname=$(get_container_name $i)
+                            local is_running=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -c "^${cname}$" || true)
+                            if [ "${is_running:-0}" -gt 0 ]; then
+                                local started=$(docker inspect --format='{{.State.StartedAt}}' "$cname" 2>/dev/null)
+                                if [ -n "$started" ]; then
+                                    local se=$(date -d "$started" +%s 2>/dev/null || echo 0)
+                                    local now_s=$(date +%s)
+                                    if [ "$se" -gt 0 ] 2>/dev/null && [ "$se" -le "$now_s" ] 2>/dev/null; then
+                                        local diff=$(( now_s - se ))
+                                        local d=$((diff / 86400)) h=$(( (diff % 86400) / 3600 )) m=$(( (diff % 3600) / 60 ))
+                                        ut_msg+="📦 Container ${i}: ${d}d ${h}h ${m}m"
+                                    else
+                                        ut_msg+="📦 Container ${i}: ⚠ unknown"
+                                    fi
+                                else
+                                    ut_msg+="📦 Container ${i}: ⚠ unknown"
+                                fi
+                            else
+                                ut_msg+="📦 Container ${i}: 🔴 stopped"
+                            fi
+                            ut_msg+=$'\n'
+                        done
+                        local avail=$(calc_uptime_pct 86400)
+                        ut_msg+=$'\n'
+                        ut_msg+="📈 Availability: ${avail}% (24h)"
+                        telegram_send "$ut_msg"
+                    fi
+                    ;;
+                ct_*)
+                    if [ "$cb_data" = "ct_${_cb_label}" ]; then
+                        telegram_answer_callback "$cb_id" "Fetching containers..."
+                        local ct_msg="📦 *Container Status*"
+                        ct_msg+=$'\n'
+                        local docker_names=$(docker ps --format '{{.Names}}' 2>/dev/null)
+                        for i in $(seq 1 ${CONTAINER_COUNT:-1}); do
+                            local cname=$(get_container_name $i)
+                            ct_msg+=$'\n'
+                            if echo "$docker_names" | grep -q "^${cname}$"; then
+                                ct_msg+="C${i} (${cname}): 🟢 Running"
+                                ct_msg+=$'\n'
+                                local logs=$(timeout 5 docker logs --tail 400 "$cname" 2>&1 | grep "\[STATS\]" | tail -1)
+                                if [ -n "$logs" ]; then
+                                    local c_cing c_conn c_up c_down
+                                    IFS='|' read -r c_cing c_conn c_up c_down <<< "$(echo "$logs" | awk '{
+                                        cing=0; conn=0; up=""; down=""
+                                        for(j=1;j<=NF;j++){
+                                            if($j=="Connecting:") cing=$(j+1)+0
+                                            else if($j=="Connected:") conn=$(j+1)+0
+                                            else if($j=="Up:"){for(k=j+1;k<=NF;k++){if($k=="|"||$k~/Down:/)break; up=up (up?" ":"") $k}}
+                                            else if($j=="Down:"){for(k=j+1;k<=NF;k++){if($k=="|"||$k~/Uptime:/)break; down=down (down?" ":"") $k}}
+                                        }
+                                        printf "%d|%d|%s|%s", cing, conn, up, down
+                                    }')"
+                                    ct_msg+="  👥 Connected: ${c_conn:-0} | Connecting: ${c_cing:-0}"
+                                    ct_msg+=$'\n'
+                                    ct_msg+="  ⬆ Up: ${c_up:-N/A}  ⬇ Down: ${c_down:-N/A}"
+                                else
+                                    ct_msg+="  ⚠ No stats available yet"
+                                fi
+                            else
+                                ct_msg+="C${i} (${cname}): 🔴 Stopped"
+                            fi
+                            ct_msg+=$'\n'
+                        done
+                        ct_msg+=$'\n'
+                        ct_msg+="/restart\_N  /stop\_N  /start\_N — manage containers"
+                        telegram_send "$ct_msg"
+                    fi
+                    ;;
+                sg_*)
+                    if [ "$cb_data" = "sg_${_cb_label}" ]; then
+                        telegram_answer_callback "$cb_id" "Fetching settings..."
+                        local bw_display="${BANDWIDTH:-5}"
+                        if [ "$bw_display" = "-1" ]; then
+                            bw_display="Unlimited"
+                        else
+                            bw_display="${bw_display} Mbps"
+                        fi
+                        local dc_display="${DATA_CAP_GB:-0}"
+                        if [ "$dc_display" = "0" ]; then
+                            dc_display="Unlimited"
+                        else
+                            dc_display="${dc_display} GB"
+                        fi
+                        local st_msg="⚙️ *Current Settings*"
+                        st_msg+=$'\n'
+                        st_msg+="👥 Max Clients: ${MAX_CLIENTS:-200}"
+                        st_msg+=$'\n'
+                        st_msg+="📶 Bandwidth: ${bw_display}"
+                        st_msg+=$'\n'
+                        st_msg+="📦 Containers: ${CONTAINER_COUNT:-1}"
+                        st_msg+=$'\n'
+                        st_msg+="💾 Data Cap: ${dc_display}"
+                        st_msg+=$'\n'
+                        st_msg+="📊 Tracker: ${TRACKER_ENABLED:-true}"
+                        st_msg+=$'\n'
+                        st_msg+="🔔 Report Interval: every ${TELEGRAM_INTERVAL:-6}h"
+                        st_msg+=$'\n'
+                        st_msg+="🔕 Alerts: ${TELEGRAM_ALERTS_ENABLED:-true}"
+                        st_msg+=$'\n'
+                        st_msg+="🌡 CPU Alert: ${TELEGRAM_CPU_ALERT:-true}"
+                        st_msg+=$'\n'
+                        st_msg+="✉️ MTProto: ${MTPROTO_ENABLED:-false}"
+                        telegram_send "$st_msg"
+                    fi
+                    ;;
+                he_*)
+                    if [ "$cb_data" = "he_${_cb_label}" ]; then
+                        telegram_answer_callback "$cb_id" "Running health check..."
+                        local h_msg="🏥 *Health Check*"
+                        h_msg+=$'\n'
+                        if docker info >/dev/null 2>&1; then
+                            h_msg+="🐳 Docker: ✅ Running"
+                        else
+                            h_msg+="🐳 Docker: ❌ Not running"
+                        fi
+                        h_msg+=$'\n'
+                        for i in $(seq 1 ${CONTAINER_COUNT:-1}); do
+                            local cname=$(get_container_name "$i")
+                            local is_running=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -c "^${cname}$" || true)
+                            local restarts=$(docker inspect --format='{{.RestartCount}}' "$cname" 2>/dev/null || echo "N/A")
+                            if [ "${is_running:-0}" -gt 0 ]; then
+                                h_msg+="📦 ${cname}: 🟢 Running (restarts: ${restarts})"
+                            else
+                                h_msg+="📦 ${cname}: 🔴 Stopped (restarts: ${restarts})"
+                            fi
+                            h_msg+=$'\n'
+                        done
+                        local net_ok=false
+                        for i in $(seq 1 ${CONTAINER_COUNT:-1}); do
+                            local cname=$(get_container_name "$i")
+                            if timeout 5 docker logs --tail 100 "$cname" 2>&1 | grep -q "\[STATS\]\|Connected to Psiphon"; then
+                                net_ok=true
+                                break
+                            fi
+                        done
+                        if [ "$net_ok" = true ]; then
+                            h_msg+="🌐 Network: ✅ Connected"
+                        else
+                            h_msg+="🌐 Network: ⚠️ No connection detected"
+                        fi
+                        h_msg+=$'\n'
+                        if command -v systemctl &>/dev/null && systemctl is-active conduit-tracker.service &>/dev/null; then
+                            h_msg+="📊 Tracker: ✅ Active"
+                        elif pgrep -f "conduit-tracker" &>/dev/null; then
+                            h_msg+="📊 Tracker: ✅ Active"
+                        else
+                            h_msg+="📊 Tracker: ❌ Inactive"
+                        fi
+                        h_msg+=$'\n'
+                        if command -v geoiplookup &>/dev/null; then
+                            h_msg+="🌍 GeoIP: ✅ geoiplookup"
+                        elif command -v mmdblookup &>/dev/null; then
+                            h_msg+="🌍 GeoIP: ✅ mmdblookup"
+                        else
+                            h_msg+="🌍 GeoIP: ⚠️ Not installed"
+                        fi
+                        telegram_send "$h_msg"
+                    fi
+                    ;;
+                up_*)
+                    if [ "$cb_data" = "up_${_cb_label}" ]; then
+                        telegram_answer_callback "$cb_id" "Updating..."
+                        telegram_send "🔄 Checking for updates..."
+                        local conduit_img="ghcr.io/ssmirr/conduit/conduit:latest"
+                        local pull_out
+                        pull_out=$(docker pull "$conduit_img" 2>&1)
+                        if [ $? -ne 0 ]; then
+                            telegram_send "❌ Failed to pull image. Check internet connection."
+                        elif echo "$pull_out" | grep -q "Status: Image is up to date"; then
+                            telegram_send "✅ Docker image is already up to date."
+                        elif echo "$pull_out" | grep -q "Downloaded newer image\|Pull complete"; then
+                            telegram_send "📦 New image found. Recreating containers..."
+                            local upd_ok=0 upd_fail=0
+                            for i in $(seq 1 ${CONTAINER_COUNT:-1}); do
+                                local cname=$(get_container_name "$i")
+                                local vname
+                                if [ "$i" -eq 1 ]; then vname="conduit-data"; else vname="conduit-data-${i}"; fi
+                                local mc=${MAX_CLIENTS:-200}
+                                local bw=${BANDWIDTH:-5}
+                                local mc_var="MAX_CLIENTS_${i}"
+                                [ -n "${!mc_var:-}" ] && mc="${!mc_var}"
+                                local bw_var="BANDWIDTH_${i}"
+                                [ -n "${!bw_var:-}" ] && bw="${!bw_var}"
+                                local resource_args=""
+                                local cpus_var="CPUS_${i}"
+                                [ -n "${!cpus_var:-}" ] && resource_args+="--cpus ${!cpus_var} "
+                                [ -z "${!cpus_var:-}" ] && [ -n "${DOCKER_CPUS:-}" ] && resource_args+="--cpus ${DOCKER_CPUS} "
+                                local mem_var="MEMORY_${i}"
+                                [ -n "${!mem_var:-}" ] && resource_args+="--memory ${!mem_var} "
+                                [ -z "${!mem_var:-}" ] && [ -n "${DOCKER_MEMORY:-}" ] && resource_args+="--memory ${DOCKER_MEMORY} "
+                                docker rm -f "$cname" >/dev/null 2>&1
+                                if docker run -d \
+                                    --name "$cname" \
+                                    --restart unless-stopped \
+                                    --log-opt max-size=15m \
+                                    --log-opt max-file=3 \
+                                    -v "${vname}:/home/conduit/data" \
+                                    --network host \
+                                    $resource_args \
+                                    "$conduit_img" \
+                                    start --max-clients "$mc" --bandwidth "$bw" --stats-file >/dev/null 2>&1; then
+                                    upd_ok=$((upd_ok + 1))
+                                else
+                                    upd_fail=$((upd_fail + 1))
+                                fi
+                            done
+                            docker image prune -f >/dev/null 2>&1
+                            if [ "$upd_fail" -eq 0 ]; then
+                                telegram_send "✅ Update complete. ${upd_ok} container(s) recreated with new image."
+                            else
+                                telegram_send "⚠️ Update: ${upd_ok} OK, ${upd_fail} failed."
+                            fi
+                        else
+                            telegram_send "✅ Image check complete. No changes detected."
+                        fi
+                    fi
+                    ;;
+                ra_*)
+                    if [ "$cb_data" = "ra_${_cb_label}" ]; then
+                        telegram_answer_callback "$cb_id" "Restarting all..."
+                        local ra_ok=0 ra_fail=0
+                        for i in $(seq 1 ${CONTAINER_COUNT:-1}); do
+                            local cname=$(get_container_name "$i")
+                            docker restart "$cname" >/dev/null 2>&1 && ra_ok=$((ra_ok + 1)) || ra_fail=$((ra_fail + 1))
+                        done
+                        if [ "$SNOWFLAKE_ENABLED" = "true" ]; then
+                            local si
+                            for si in $(seq 1 ${SNOWFLAKE_COUNT:-1}); do
+                                local sf_cname="snowflake-proxy"
+                                [ "$si" -gt 1 ] && sf_cname="snowflake-proxy-${si}"
+                                docker restart "$sf_cname" >/dev/null 2>&1 && ra_ok=$((ra_ok + 1)) || ra_fail=$((ra_fail + 1))
+                            done
+                        fi
+                        if [ "$MTPROTO_ENABLED" = "true" ]; then
+                            if [ -f "$PERSIST_DIR/data_cap_exceeded" ]; then
+                                ra_fail=$((ra_fail + 1))
+                            else
+                                save_mtproto_traffic
+                                docker restart "mtproto-proxy" >/dev/null 2>&1 && ra_ok=$((ra_ok + 1)) || ra_fail=$((ra_fail + 1))
+                            fi
+                        fi
+                        if [ "$ra_fail" -eq 0 ]; then
+                            telegram_send "✅ All ${ra_ok} containers restarted successfully"
+                        else
+                            telegram_send "⚠️ Restarted ${ra_ok} containers (${ra_fail} failed)"
+                        fi
+                    fi
+                    ;;
+                sa_*)
+                    if [ "$cb_data" = "sa_${_cb_label}" ]; then
+                        telegram_answer_callback "$cb_id" "Starting all..."
+                        local sa_ok=0 sa_fail=0
+                        for i in $(seq 1 ${CONTAINER_COUNT:-1}); do
+                            local cname=$(get_container_name "$i")
+                            docker start "$cname" >/dev/null 2>&1 && sa_ok=$((sa_ok + 1)) || sa_fail=$((sa_fail + 1))
+                        done
+                        if [ "$SNOWFLAKE_ENABLED" = "true" ]; then
+                            local si
+                            for si in $(seq 1 ${SNOWFLAKE_COUNT:-1}); do
+                                local sf_cname="snowflake-proxy"
+                                [ "$si" -gt 1 ] && sf_cname="snowflake-proxy-${si}"
+                                docker start "$sf_cname" >/dev/null 2>&1 && sa_ok=$((sa_ok + 1)) || sa_fail=$((sa_fail + 1))
+                            done
+                        fi
+                        if [ "$MTPROTO_ENABLED" = "true" ]; then
+                            if [ -f "$PERSIST_DIR/data_cap_exceeded" ]; then
+                                sa_fail=$((sa_fail + 1))
+                            else
+                                start_mtproto >/dev/null 2>&1 && sa_ok=$((sa_ok + 1)) || sa_fail=$((sa_fail + 1))
+                            fi
+                        fi
+                        if [ "$sa_fail" -eq 0 ]; then
+                            telegram_send "🟢 All ${sa_ok} containers started successfully"
+                        else
+                            telegram_send "⚠️ Started ${sa_ok} containers (${sa_fail} failed)"
+                        fi
+                    fi
+                    ;;
+                xa_*)
+                    if [ "$cb_data" = "xa_${_cb_label}" ]; then
+                        telegram_answer_callback "$cb_id" "Stopping all..."
+                        local sto_ok=0 sto_fail=0
+                        for i in $(seq 1 ${CONTAINER_COUNT:-1}); do
+                            local cname=$(get_container_name "$i")
+                            docker stop "$cname" >/dev/null 2>&1 && sto_ok=$((sto_ok + 1)) || sto_fail=$((sto_fail + 1))
+                        done
+                        if [ "$SNOWFLAKE_ENABLED" = "true" ]; then
+                            local si
+                            for si in $(seq 1 ${SNOWFLAKE_COUNT:-1}); do
+                                local sf_cname="snowflake-proxy"
+                                [ "$si" -gt 1 ] && sf_cname="snowflake-proxy-${si}"
+                                docker stop "$sf_cname" >/dev/null 2>&1 && sto_ok=$((sto_ok + 1)) || sto_fail=$((sto_fail + 1))
+                            done
+                        fi
+                        if [ "$MTPROTO_ENABLED" = "true" ]; then
+                            save_mtproto_traffic
+                            docker stop --timeout 10 "mtproto-proxy" >/dev/null 2>&1 && sto_ok=$((sto_ok + 1)) || sto_fail=$((sto_fail + 1))
+                        fi
+                        if [ "$sto_fail" -eq 0 ]; then
+                            telegram_send "🛑 All ${sto_ok} containers stopped"
+                        else
+                            telegram_send "⚠️ Stopped ${sto_ok} containers (${sto_fail} failed)"
+                        fi
+                    fi
+                    ;;
+                rn*|xn*|tn*)
+                    local _pfx="${cb_data:0:2}"
+                    local _tmp="${cb_data:2}"
+                    local _num="${_tmp%%_*}"
+                    if [ "$cb_data" = "${_pfx}${_num}_${_cb_label}" ] && [[ "$_num" =~ ^[0-9]+$ ]]; then
+                        local action="restart"
+                        [ "$_pfx" = "xn" ] && action="stop"
+                        [ "$_pfx" = "tn" ] && action="start"
+                        telegram_answer_callback "$cb_id" "${action^}ing container ${_num}..."
+                        local cname=$(get_container_name "$_num")
+                        if docker "$action" "$cname" >/dev/null 2>&1; then
+                            local emoji="✅"
+                            [ "$action" = "stop" ] && emoji="🛑"
+                            [ "$action" = "start" ] && emoji="🟢"
+                            telegram_send "${emoji} Container ${_num} (${cname}): ${action} successful"
+                        else
+                            telegram_send "❌ Failed to ${action} container ${_num} (${cname})"
+                        fi
+                    fi
+                    ;;
+                lo*)
+                    local _tmp="${cb_data#lo}"
+                    local _num="${_tmp%%_*}"
+                    if [ "$cb_data" = "lo${_num}_${_cb_label}" ] && [[ "$_num" =~ ^[0-9]+$ ]]; then
+                        telegram_answer_callback "$cb_id" "Fetching logs..."
+                        local cname=$(get_container_name "$_num")
+                        local log_output
+                        log_output=$(timeout 10 docker logs --tail 15 "$cname" 2>&1 || echo "Failed to get logs")
+                        if [ ${#log_output} -gt 3800 ]; then
+                            log_output="${log_output:0:3800}..."
+                        fi
+                        local escaped_cname=$(escape_md "$cname")
+                        telegram_send "📋 *Logs: ${escaped_cname}* (last 15 lines):
+\`\`\`
+${log_output}
+\`\`\`"
+                    fi
+                    ;;
+                sw_*)
+                    if [ "$cb_data" = "sw_${_cb_label}" ]; then
+                        telegram_answer_callback "$cb_id" "Fetching Snowflake..."
+                        local _sf_running=false
+                        is_snowflake_running && _sf_running=true
+                        local _sf_status="🔴 Stopped"
+                        [ "$_sf_running" = "true" ] && _sf_status="🟢 Running"
+                        local _sf_count="${SNOWFLAKE_COUNT:-1}"
+                        local _sf_msg="❄️ *Snowflake Proxy*
+Status: ${_sf_status}
+Instances: ${_sf_count}"
+                        local _sf_buttons=""
+                        if [ "$_sf_running" = "true" ]; then
+                            _sf_buttons="{\"text\":\"🛑 Stop\",\"callback_data\":\"fp_${_cb_label}\"},{\"text\":\"🔄 Restart\",\"callback_data\":\"fr_${_cb_label}\"}"
+                        else
+                            _sf_buttons="{\"text\":\"▶️ Start\",\"callback_data\":\"fs_${_cb_label}\"}"
+                        fi
+                        local _sf_kb="{\"inline_keyboard\":[[${_sf_buttons}]]}"
+                        telegram_send_inline_keyboard "$_sf_msg" "$_sf_kb"
+                    fi
+                    ;;
+                fs_*)
+                    if [ "$cb_data" = "fs_${_cb_label}" ]; then
+                        telegram_answer_callback "$cb_id" "Starting Snowflake..."
+                        start_snowflake >/dev/null 2>&1
+                        if is_snowflake_running; then
+                            telegram_send "🟢 Snowflake proxy started."
+                        else
+                            telegram_send "❌ Failed to start Snowflake proxy."
+                        fi
+                    fi
+                    ;;
+                fp_*)
+                    if [ "$cb_data" = "fp_${_cb_label}" ]; then
+                        telegram_answer_callback "$cb_id" "Stopping Snowflake..."
+                        stop_snowflake >/dev/null 2>&1
+                        telegram_send "🛑 Snowflake proxy stopped."
+                    fi
+                    ;;
+                fr_*)
+                    if [ "$cb_data" = "fr_${_cb_label}" ]; then
+                        telegram_answer_callback "$cb_id" "Restarting Snowflake..."
+                        restart_snowflake >/dev/null 2>&1
+                        if is_snowflake_running; then
+                            telegram_send "🟢 Snowflake proxy restarted."
+                        else
+                            telegram_send "❌ Failed to restart Snowflake proxy."
+                        fi
+                    fi
+                    ;;
+                px_*)
+                    if [ "$cb_data" = "px_${_cb_label}" ]; then
+                        telegram_answer_callback "$cb_id" "Fetching proxy..."
+                        local _mt_ip
+                        _mt_ip=$(get_public_ip)
+                        if [ -z "$_mt_ip" ]; then
+                            telegram_send "❌ Could not detect server IP."
+                        else
+                            local _mt_link="tg://proxy?server=${_mt_ip}&port=${MTPROTO_PORT}&secret=${MTPROTO_SECRET}"
+                            local _mt_running=false
+                            is_mtproto_running && _mt_running=true
+                            local _mt_status="🔴 Stopped"
+                            [ "$_mt_running" = "true" ] && _mt_status="🟢 Running"
+                            local _mt_t
+                            _mt_t=$(get_mtproto_traffic)
+                            local _mt_dl _mt_ul
+                            read -r _mt_dl _mt_ul <<< "$_mt_t"
+                            local _mt_traffic=""
+                            if [ "${_mt_dl:-0}" -gt 0 ] || [ "${_mt_ul:-0}" -gt 0 ] 2>/dev/null; then
+                                _mt_traffic="
+Traffic: ↓ $(format_bytes ${_mt_dl:-0})  ↑ $(format_bytes ${_mt_ul:-0})"
+                            fi
+                            local _mt_msg="✉️ *MTProto Proxy*
+Status: ${_mt_status}
+Server: \`${_mt_ip}\`
+Port: ${MTPROTO_PORT}
+Domain: ${MTPROTO_DOMAIN}${_mt_traffic}
+
+🔗 [Connect to Proxy](${_mt_link})"
+                            local _mt_buttons=""
+                            if [ "$_mt_running" = "true" ]; then
+                                _mt_buttons="{\"text\":\"🛑 Stop\",\"callback_data\":\"mp_${_cb_label}\"},{\"text\":\"🔄 Restart\",\"callback_data\":\"mr_${_cb_label}\"}"
+                            else
+                                _mt_buttons="{\"text\":\"▶️ Start\",\"callback_data\":\"ms_${_cb_label}\"}"
+                            fi
+                            local _mt_kb="{\"inline_keyboard\":[[${_mt_buttons}]]}"
+                            if command -v qrencode &>/dev/null; then
+                                qrencode -t PNG -o /tmp/mtproto_qr.png "$_mt_link" 2>/dev/null
+                                if [ -f /tmp/mtproto_qr.png ]; then
+                                    telegram_send_photo "/tmp/mtproto_qr.png" "$_mt_msg"
+                                    rm -f /tmp/mtproto_qr.png
+                                    telegram_send_inline_keyboard "⚙️ MTProto Controls:" "$_mt_kb"
+                                else
+                                    telegram_send_inline_keyboard "$_mt_msg" "$_mt_kb"
+                                fi
+                            else
+                                telegram_send_inline_keyboard "$_mt_msg" "$_mt_kb"
+                            fi
+                        fi
+                    fi
+                    ;;
+                ms_*)
+                    if [ "$cb_data" = "ms_${_cb_label}" ]; then
+                        telegram_answer_callback "$cb_id" "Starting MTProto..."
+                        if [ "$MTPROTO_ENABLED" = "true" ] && [ -n "$MTPROTO_SECRET" ]; then
+                            start_mtproto >/dev/null 2>&1
+                            if is_mtproto_running; then
+                                telegram_send "🟢 MTProto proxy started."
+                            else
+                                telegram_send "❌ Failed to start MTProto proxy."
+                            fi
+                        else
+                            telegram_send "❌ MTProto not configured."
+                        fi
+                    fi
+                    ;;
+                mp_*)
+                    if [ "$cb_data" = "mp_${_cb_label}" ]; then
+                        telegram_answer_callback "$cb_id" "Stopping MTProto..."
+                        if is_mtproto_running; then
+                            save_mtproto_traffic
+                            docker stop --timeout 10 "mtproto-proxy" >/dev/null 2>&1
+                            telegram_send "🛑 MTProto proxy stopped."
+                        else
+                            telegram_send "ℹ️ MTProto proxy is not running."
+                        fi
+                    fi
+                    ;;
+                mr_*)
+                    if [ "$cb_data" = "mr_${_cb_label}" ]; then
+                        telegram_answer_callback "$cb_id" "Restarting MTProto..."
+                        if [ -f "$PERSIST_DIR/data_cap_exceeded" ]; then
+                            telegram_send "⚠️ Data cap exceeded. MTProto will not restart."
+                        elif [ "$MTPROTO_ENABLED" = "true" ] && [ -n "$MTPROTO_SECRET" ]; then
+                            save_mtproto_traffic
+                            docker restart "mtproto-proxy" >/dev/null 2>&1
+                            if is_mtproto_running; then
+                                telegram_send "🟢 MTProto proxy restarted."
+                            else
+                                telegram_send "❌ Failed to restart MTProto proxy."
+                            fi
+                        else
+                            telegram_send "❌ MTProto not configured."
+                        fi
+                    fi
+                    ;;
+                qs_*)
+                    if [ "$cb_data" = "qs_${_cb_label}" ]; then
+                        telegram_answer_callback "$cb_id" "QR code..."
+                        if [ "${CONTAINER_COUNT:-1}" -le 1 ]; then
+                            local vol=$(get_volume_name 1)
+                            local raw_key=$(get_raw_key "$vol")
+                            local node_id=$(get_node_id "$vol")
+                            if [ -n "$raw_key" ] && command -v qrencode &>/dev/null; then
+                                local hostname_str=$(hostname 2>/dev/null || echo "conduit")
+                                local claim_json="{\"version\":1,\"data\":{\"key\":\"${raw_key}\",\"name\":\"${hostname_str}\"}}"
+                                local claim_b64=$(echo -n "$claim_json" | base64 | tr -d '\n')
+                                local claim_url="network.ryve.app://(app)/conduits?claim=${claim_b64}"
+                                qrencode -t PNG -o /tmp/conduit_qr_1.png "$claim_url" 2>/dev/null
+                                if [ -f /tmp/conduit_qr_1.png ]; then
+                                    telegram_send_photo "/tmp/conduit_qr_1.png" "Conduit ID: ${node_id:-unknown}"
+                                    rm -f /tmp/conduit_qr_1.png
+                                else
+                                    telegram_send "❌ Failed to generate QR code"
+                                fi
+                            elif ! command -v qrencode &>/dev/null; then
+                                telegram_send "❌ qrencode not installed. Install with: apt install qrencode"
+                            else
+                                telegram_send "❌ Key not available. Start container first."
+                            fi
+                        else
+                            local rows="" row="" row_count=0
+                            for i in $(seq 1 ${CONTAINER_COUNT:-1}); do
+                                [ -n "$row" ] && row+=","
+                                row+="{\"text\":\"Container ${i}\",\"callback_data\":\"qn${i}_${_cb_label}\"}"
+                                row_count=$((row_count + 1))
+                                if [ "$row_count" -ge 4 ]; then
+                                    [ -n "$rows" ] && rows+=","
+                                    rows+="[${row}]"
+                                    row=""
+                                    row_count=0
+                                fi
+                            done
+                            if [ -n "$row" ]; then
+                                [ -n "$rows" ] && rows+=","
+                                rows+="[${row}]"
+                            fi
+                            local kb="{\"inline_keyboard\":[${rows}]}"
+                            telegram_send_inline_keyboard "📱 Select a container for QR code:" "$kb"
+                        fi
+                    fi
+                    ;;
+                qn*)
+                    local _tmp="${cb_data#qn}"
+                    local _num="${_tmp%%_*}"
+                    if [ "$cb_data" = "qn${_num}_${_cb_label}" ] && [[ "$_num" =~ ^[0-9]+$ ]] && [ "$_num" -ge 1 ] && [ "$_num" -le "${CONTAINER_COUNT:-1}" ]; then
+                        telegram_answer_callback "$cb_id" "Generating QR for container ${_num}..."
+                        local vol=$(get_volume_name "$_num")
+                        local raw_key=$(get_raw_key "$vol")
+                        local node_id=$(get_node_id "$vol")
+                        if [ -n "$raw_key" ] && command -v qrencode &>/dev/null; then
+                            local hostname_str=$(hostname 2>/dev/null || echo "conduit")
+                            local claim_json="{\"version\":1,\"data\":{\"key\":\"${raw_key}\",\"name\":\"${hostname_str}\"}}"
+                            local claim_b64=$(echo -n "$claim_json" | base64 | tr -d '\n')
+                            local claim_url="network.ryve.app://(app)/conduits?claim=${claim_b64}"
+                            qrencode -t PNG -o "/tmp/conduit_qr_${_num}.png" "$claim_url" 2>/dev/null
+                            if [ -f "/tmp/conduit_qr_${_num}.png" ]; then
+                                telegram_send_photo "/tmp/conduit_qr_${_num}.png" "Container ${_num} — Conduit ID: ${node_id:-unknown}"
+                                rm -f "/tmp/conduit_qr_${_num}.png"
+                            else
+                                telegram_send "❌ Failed to generate QR code for container ${_num}"
+                            fi
+                        elif ! command -v qrencode &>/dev/null; then
+                            telegram_send "❌ qrencode not installed. Install with: apt install qrencode"
+                        else
+                            telegram_send "❌ Key not available for container ${_num}. Start it first."
+                        fi
+                    fi
+                    ;;
                 *)
                     telegram_answer_callback "$cb_id" ""
                     ;;
@@ -7198,289 +7808,50 @@ except Exception:
             continue
         fi
 
-        # Handle regular commands
+        # Handle regular commands — show server selection for multi-server support
         local cmd="$field2"
         case "$cmd" in
             /status|/status@*)
-                local _lbl="${TELEGRAM_SERVER_LABEL:-$(hostname 2>/dev/null || echo 'server')}"
-                local _cb_lbl=$(echo "$_lbl" | tr -cd 'a-zA-Z0-9_-' | head -c 50)
-                [ -z "$_cb_lbl" ] && _cb_lbl=$(hostname 2>/dev/null | tr -cd 'a-zA-Z0-9_-' | head -c 50)
-                [ -z "$_cb_lbl" ] && _cb_lbl="server"
-                local _lbl_j=$(printf '%s' "$_lbl" | sed 's/\\/\\\\/g; s/"/\\"/g')
-                local kb="{\"inline_keyboard\":[[{\"text\":\"📊 ${_lbl_j}\",\"callback_data\":\"st_${_cb_lbl}\"}]]}"
-                telegram_send_inline_keyboard "Tap to view status:" "$kb"
+                telegram_send_inline_keyboard "Tap to view status:" "$(_server_kb "st_" "📊")"
                 ;;
             /peers|/peers@*)
-                local _lbl="${TELEGRAM_SERVER_LABEL:-$(hostname 2>/dev/null || echo 'server')}"
-                local _cb_lbl=$(echo "$_lbl" | tr -cd 'a-zA-Z0-9_-' | head -c 50)
-                [ -z "$_cb_lbl" ] && _cb_lbl=$(hostname 2>/dev/null | tr -cd 'a-zA-Z0-9_-' | head -c 50)
-                [ -z "$_cb_lbl" ] && _cb_lbl="server"
-                local _lbl_j=$(printf '%s' "$_lbl" | sed 's/\\/\\\\/g; s/"/\\"/g')
-                local kb="{\"inline_keyboard\":[[{\"text\":\"👥 ${_lbl_j}\",\"callback_data\":\"pr_${_cb_lbl}\"}]]}"
-                telegram_send_inline_keyboard "Tap to view peers:" "$kb"
+                telegram_send_inline_keyboard "Tap to view peers:" "$(_server_kb "pr_" "👥")"
                 ;;
             /uptime|/uptime@*)
-                local ut_msg="⏱ *Uptime Report*"
-                ut_msg+=$'\n'
-                for i in $(seq 1 ${CONTAINER_COUNT:-1}); do
-                    local cname=$(get_container_name $i)
-                    local is_running=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -c "^${cname}$" || true)
-                    if [ "${is_running:-0}" -gt 0 ]; then
-                        local started=$(docker inspect --format='{{.State.StartedAt}}' "$cname" 2>/dev/null)
-                        if [ -n "$started" ]; then
-                            local se=$(date -d "$started" +%s 2>/dev/null || echo 0)
-                            local diff=$(( $(date +%s) - se ))
-                            local d=$((diff / 86400)) h=$(( (diff % 86400) / 3600 )) m=$(( (diff % 3600) / 60 ))
-                            ut_msg+="📦 Container ${i}: ${d}d ${h}h ${m}m"
-                        else
-                            ut_msg+="📦 Container ${i}: ⚠ unknown"
-                        fi
-                    else
-                        ut_msg+="📦 Container ${i}: 🔴 stopped"
-                    fi
-                    ut_msg+=$'\n'
-                done
-                local avail=$(calc_uptime_pct 86400)
-                ut_msg+=$'\n'
-                ut_msg+="📈 Availability: ${avail}% (24h)"
-                telegram_send "$ut_msg"
+                telegram_send_inline_keyboard "Tap to view uptime:" "$(_server_kb "ut_" "⏱")"
                 ;;
             /containers|/containers@*)
-                local ct_msg="📦 *Container Status*"
-                ct_msg+=$'\n'
-                local docker_names=$(docker ps --format '{{.Names}}' 2>/dev/null)
-                for i in $(seq 1 ${CONTAINER_COUNT:-1}); do
-                    local cname=$(get_container_name $i)
-                    ct_msg+=$'\n'
-                    if echo "$docker_names" | grep -q "^${cname}$"; then
-                        ct_msg+="C${i} (${cname}): 🟢 Running"
-                        ct_msg+=$'\n'
-                        local logs=$(timeout 5 docker logs --tail 400 "$cname" 2>&1 | grep "\[STATS\]" | tail -1)
-                        if [ -n "$logs" ]; then
-                            local c_cing c_conn c_up c_down
-                            IFS='|' read -r c_cing c_conn c_up c_down <<< $(echo "$logs" | awk '{
-                                cing=0; conn=0; up=""; down=""
-                                for(j=1;j<=NF;j++){
-                                    if($j=="Connecting:") cing=$(j+1)+0
-                                    else if($j=="Connected:") conn=$(j+1)+0
-                                    else if($j=="Up:"){for(k=j+1;k<=NF;k++){if($k=="|"||$k~/Down:/)break; up=up (up?" ":"") $k}}
-                                    else if($j=="Down:"){for(k=j+1;k<=NF;k++){if($k=="|"||$k~/Uptime:/)break; down=down (down?" ":"") $k}}
-                                }
-                                printf "%d|%d|%s|%s", cing, conn, up, down
-                            }')
-                            ct_msg+="  👥 Connected: ${c_conn:-0} | Connecting: ${c_cing:-0}"
-                            ct_msg+=$'\n'
-                            ct_msg+="  ⬆ Up: ${c_up:-N/A}  ⬇ Down: ${c_down:-N/A}"
-                        else
-                            ct_msg+="  ⚠ No stats available yet"
-                        fi
-                    else
-                        ct_msg+="C${i} (${cname}): 🔴 Stopped"
-                    fi
-                    ct_msg+=$'\n'
-                done
-                ct_msg+=$'\n'
-                ct_msg+="/restart\_N  /stop\_N  /start\_N — manage containers"
-                telegram_send "$ct_msg"
+                telegram_send_inline_keyboard "Tap to view containers:" "$(_server_kb "ct_" "📦")"
                 ;;
             /restart_all|/restart_all@*)
-                local ra_ok=0 ra_fail=0
-                for i in $(seq 1 ${CONTAINER_COUNT:-1}); do
-                    local cname=$(get_container_name "$i")
-                    if docker restart "$cname" >/dev/null 2>&1; then
-                        ra_ok=$((ra_ok + 1))
-                    else
-                        ra_fail=$((ra_fail + 1))
-                    fi
-                done
-                # Restart snowflake containers if enabled
-                if [ "$SNOWFLAKE_ENABLED" = "true" ]; then
-                    local si
-                    for si in $(seq 1 ${SNOWFLAKE_COUNT:-1}); do
-                        local sf_cname="snowflake-proxy"
-                        [ "$si" -gt 1 ] && sf_cname="snowflake-proxy-${si}"
-                        docker restart "$sf_cname" >/dev/null 2>&1 && ra_ok=$((ra_ok + 1)) || ra_fail=$((ra_fail + 1))
-                    done
-                fi
-                # Restart mtproto container if enabled
-                if [ "$MTPROTO_ENABLED" = "true" ]; then
-                    if [ -f "$PERSIST_DIR/data_cap_exceeded" ]; then
-                        ra_fail=$((ra_fail + 1))
-                    else
-                        save_mtproto_traffic
-                        docker restart "mtproto-proxy" >/dev/null 2>&1 && ra_ok=$((ra_ok + 1)) || ra_fail=$((ra_fail + 1))
-                    fi
-                fi
-                if [ "$ra_fail" -eq 0 ]; then
-                    telegram_send "✅ All ${ra_ok} containers restarted successfully"
-                else
-                    telegram_send "⚠️ Restarted ${ra_ok} containers (${ra_fail} failed)"
-                fi
+                telegram_send_inline_keyboard "Tap server to restart all:" "$(_server_kb "ra_" "🔄")"
                 ;;
             /start_all|/start_all@*)
-                local sa_ok=0 sa_fail=0
-                for i in $(seq 1 ${CONTAINER_COUNT:-1}); do
-                    local cname=$(get_container_name "$i")
-                    if docker start "$cname" >/dev/null 2>&1; then
-                        sa_ok=$((sa_ok + 1))
-                    else
-                        sa_fail=$((sa_fail + 1))
-                    fi
-                done
-                # Start snowflake containers if enabled
-                if [ "$SNOWFLAKE_ENABLED" = "true" ]; then
-                    local si
-                    for si in $(seq 1 ${SNOWFLAKE_COUNT:-1}); do
-                        local sf_cname="snowflake-proxy"
-                        [ "$si" -gt 1 ] && sf_cname="snowflake-proxy-${si}"
-                        docker start "$sf_cname" >/dev/null 2>&1 && sa_ok=$((sa_ok + 1)) || sa_fail=$((sa_fail + 1))
-                    done
-                fi
-                # Start mtproto container if enabled
-                if [ "$MTPROTO_ENABLED" = "true" ]; then
-                    if [ -f "$PERSIST_DIR/data_cap_exceeded" ]; then
-                        sa_fail=$((sa_fail + 1))
-                    else
-                        start_mtproto >/dev/null 2>&1 && sa_ok=$((sa_ok + 1)) || sa_fail=$((sa_fail + 1))
-                    fi
-                fi
-                if [ "$sa_fail" -eq 0 ]; then
-                    telegram_send "🟢 All ${sa_ok} containers started successfully"
-                else
-                    telegram_send "⚠️ Started ${sa_ok} containers (${sa_fail} failed)"
-                fi
+                telegram_send_inline_keyboard "Tap server to start all:" "$(_server_kb "sa_" "🟢")"
                 ;;
             /stop_all|/stop_all@*)
-                local sto_ok=0 sto_fail=0
-                for i in $(seq 1 ${CONTAINER_COUNT:-1}); do
-                    local cname=$(get_container_name "$i")
-                    if docker stop "$cname" >/dev/null 2>&1; then
-                        sto_ok=$((sto_ok + 1))
-                    else
-                        sto_fail=$((sto_fail + 1))
-                    fi
-                done
-                # Stop snowflake containers if enabled
-                if [ "$SNOWFLAKE_ENABLED" = "true" ]; then
-                    local si
-                    for si in $(seq 1 ${SNOWFLAKE_COUNT:-1}); do
-                        local sf_cname="snowflake-proxy"
-                        [ "$si" -gt 1 ] && sf_cname="snowflake-proxy-${si}"
-                        docker stop "$sf_cname" >/dev/null 2>&1 && sto_ok=$((sto_ok + 1)) || sto_fail=$((sto_fail + 1))
-                    done
-                fi
-                # Stop mtproto container if enabled
-                if [ "$MTPROTO_ENABLED" = "true" ]; then
-                    save_mtproto_traffic
-                    docker stop --timeout 10 "mtproto-proxy" >/dev/null 2>&1 && sto_ok=$((sto_ok + 1)) || sto_fail=$((sto_fail + 1))
-                fi
-                if [ "$sto_fail" -eq 0 ]; then
-                    telegram_send "🛑 All ${sto_ok} containers stopped"
-                else
-                    telegram_send "⚠️ Stopped ${sto_ok} containers (${sto_fail} failed)"
-                fi
+                telegram_send_inline_keyboard "Tap server to stop all:" "$(_server_kb "xa_" "🛑")"
                 ;;
             /restart_*|/stop_*|/start_*)
-                local action="${cmd%%_*}"     # /restart, /stop, or /start
-                action="${action#/}"          # restart, stop, or start
+                local action="${cmd%%_*}"
+                action="${action#/}"
                 local num="${cmd#*_}"
-                num="${num%%@*}"              # strip @botname suffix
+                num="${num%%@*}"
                 if ! [[ "$num" =~ ^[0-9]+$ ]] || [ "$num" -lt 1 ] || [ "$num" -gt "${CONTAINER_COUNT:-1}" ]; then
                     telegram_send "❌ Invalid container number: ${num}. Use 1-${CONTAINER_COUNT:-1}."
                 else
-                    local cname=$(get_container_name "$num")
-                    if docker "$action" "$cname" >/dev/null 2>&1; then
-                        local emoji="✅"
-                        [ "$action" = "stop" ] && emoji="🛑"
-                        [ "$action" = "start" ] && emoji="🟢"
-                        telegram_send "${emoji} Container ${num} (${cname}): ${action} successful"
-                    else
-                        telegram_send "❌ Failed to ${action} container ${num} (${cname})"
-                    fi
+                    local prefix="rn"
+                    local emoji="🔄"
+                    [ "$action" = "stop" ] && prefix="xn" && emoji="🛑"
+                    [ "$action" = "start" ] && prefix="tn" && emoji="🟢"
+                    telegram_send_inline_keyboard "Tap server to ${action} container ${num}:" "$(_server_kb "${prefix}${num}_" "$emoji")"
                 fi
                 ;;
             /settings|/settings@*)
-                local bw_display="${BANDWIDTH:-5}"
-                if [ "$bw_display" = "-1" ]; then
-                    bw_display="Unlimited"
-                else
-                    bw_display="${bw_display} Mbps"
-                fi
-                local dc_display="${DATA_CAP_GB:-0}"
-                if [ "$dc_display" = "0" ]; then
-                    dc_display="Unlimited"
-                else
-                    dc_display="${dc_display} GB"
-                fi
-                local st_msg="⚙️ *Current Settings*"
-                st_msg+=$'\n'
-                st_msg+="👥 Max Clients: ${MAX_CLIENTS:-200}"
-                st_msg+=$'\n'
-                st_msg+="📶 Bandwidth: ${bw_display}"
-                st_msg+=$'\n'
-                st_msg+="📦 Containers: ${CONTAINER_COUNT:-1}"
-                st_msg+=$'\n'
-                st_msg+="💾 Data Cap: ${dc_display}"
-                st_msg+=$'\n'
-                st_msg+="📊 Tracker: ${TRACKER_ENABLED:-true}"
-                st_msg+=$'\n'
-                st_msg+="🔔 Report Interval: every ${TELEGRAM_INTERVAL:-6}h"
-                st_msg+=$'\n'
-                st_msg+="🔕 Alerts: ${TELEGRAM_ALERTS_ENABLED:-true}"
-                st_msg+=$'\n'
-                st_msg+="🌡 CPU Alert: ${TELEGRAM_CPU_ALERT:-true}"
-                st_msg+=$'\n'
-                st_msg+="📡 MTProto: ${MTPROTO_ENABLED:-false}"
-                telegram_send "$st_msg"
+                telegram_send_inline_keyboard "Tap to view settings:" "$(_server_kb "sg_" "⚙")"
                 ;;
             /health|/health@*)
-                local h_msg="🏥 *Health Check*"
-                h_msg+=$'\n'
-                if docker info >/dev/null 2>&1; then
-                    h_msg+="🐳 Docker: ✅ Running"
-                else
-                    h_msg+="🐳 Docker: ❌ Not running"
-                fi
-                h_msg+=$'\n'
-                for i in $(seq 1 ${CONTAINER_COUNT:-1}); do
-                    local cname=$(get_container_name "$i")
-                    local is_running=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -c "^${cname}$" || true)
-                    local restarts=$(docker inspect --format='{{.RestartCount}}' "$cname" 2>/dev/null || echo "N/A")
-                    if [ "${is_running:-0}" -gt 0 ]; then
-                        h_msg+="📦 ${cname}: 🟢 Running (restarts: ${restarts})"
-                    else
-                        h_msg+="📦 ${cname}: 🔴 Stopped (restarts: ${restarts})"
-                    fi
-                    h_msg+=$'\n'
-                done
-                local net_ok=false
-                for i in $(seq 1 ${CONTAINER_COUNT:-1}); do
-                    local cname=$(get_container_name "$i")
-                    if timeout 5 docker logs --tail 100 "$cname" 2>&1 | grep -q "\[STATS\]\|Connected to Psiphon"; then
-                        net_ok=true
-                        break
-                    fi
-                done
-                if [ "$net_ok" = true ]; then
-                    h_msg+="🌐 Network: ✅ Connected"
-                else
-                    h_msg+="🌐 Network: ⚠️ No connection detected"
-                fi
-                h_msg+=$'\n'
-                if command -v systemctl &>/dev/null && systemctl is-active conduit-tracker.service &>/dev/null; then
-                    h_msg+="📊 Tracker: ✅ Active"
-                else
-                    h_msg+="📊 Tracker: ❌ Inactive"
-                fi
-                h_msg+=$'\n'
-                if command -v geoiplookup &>/dev/null; then
-                    h_msg+="🌍 GeoIP: ✅ geoiplookup"
-                elif command -v mmdblookup &>/dev/null; then
-                    h_msg+="🌍 GeoIP: ✅ mmdblookup"
-                else
-                    h_msg+="🌍 GeoIP: ⚠️ Not installed"
-                fi
-                telegram_send "$h_msg"
+                telegram_send_inline_keyboard "Tap to run health check:" "$(_server_kb "he_" "🩺")"
                 ;;
             /logs_*)
                 local log_num="${cmd#/logs_}"
@@ -7488,205 +7859,57 @@ except Exception:
                 if ! [[ "$log_num" =~ ^[0-9]+$ ]] || [ "$log_num" -lt 1 ] || [ "$log_num" -gt "${CONTAINER_COUNT:-1}" ]; then
                     telegram_send "❌ Invalid container number: ${log_num}. Use 1-${CONTAINER_COUNT:-1}."
                 else
-                    local cname=$(get_container_name "$log_num")
-                    local log_output
-                    log_output=$(timeout 10 docker logs --tail 15 "$cname" 2>&1 || echo "Failed to get logs")
-                    # Truncate to fit Telegram 4096 char limit
-                    if [ ${#log_output} -gt 3800 ]; then
-                        log_output="${log_output:0:3800}..."
-                    fi
-                    # Send without escape_md — code blocks render content literally
-                    local escaped_cname=$(escape_md "$cname")
-                    telegram_send "📋 *Logs: ${escaped_cname}* (last 15 lines):
-\`\`\`
-${log_output}
-\`\`\`"
+                    telegram_send_inline_keyboard "Tap server for logs (container ${log_num}):" "$(_server_kb "lo${log_num}_" "📜")"
                 fi
                 ;;
             /update|/update@*)
-                telegram_send "🔄 Checking for updates..."
-                local conduit_img="ghcr.io/ssmirr/conduit/conduit:latest"
-                local pull_out
-                pull_out=$(docker pull "$conduit_img" 2>&1)
-                if [ $? -ne 0 ]; then
-                    telegram_send "❌ Failed to pull image. Check internet connection."
-                elif echo "$pull_out" | grep -q "Status: Image is up to date"; then
-                    telegram_send "✅ Docker image is already up to date."
-                elif echo "$pull_out" | grep -q "Downloaded newer image\|Pull complete"; then
-                    telegram_send "📦 New image found. Recreating containers..."
-                    local upd_ok=0 upd_fail=0
-                    for i in $(seq 1 ${CONTAINER_COUNT:-1}); do
-                        local cname=$(get_container_name "$i")
-                        local vname
-                        if [ "$i" -eq 1 ]; then vname="conduit-data"; else vname="conduit-data-${i}"; fi
-                        local mc=${MAX_CLIENTS:-200}
-                        local bw=${BANDWIDTH:-5}
-                        # Per-container overrides
-                        local mc_var="MAX_CLIENTS_${i}"
-                        [ -n "${!mc_var:-}" ] && mc="${!mc_var}"
-                        local bw_var="BANDWIDTH_${i}"
-                        [ -n "${!bw_var:-}" ] && bw="${!bw_var}"
-                        local resource_args=""
-                        local cpus_var="CPUS_${i}"
-                        [ -n "${!cpus_var:-}" ] && resource_args+="--cpus ${!cpus_var} "
-                        [ -z "${!cpus_var:-}" ] && [ -n "${DOCKER_CPUS:-}" ] && resource_args+="--cpus ${DOCKER_CPUS} "
-                        local mem_var="MEMORY_${i}"
-                        [ -n "${!mem_var:-}" ] && resource_args+="--memory ${!mem_var} "
-                        [ -z "${!mem_var:-}" ] && [ -n "${DOCKER_MEMORY:-}" ] && resource_args+="--memory ${DOCKER_MEMORY} "
-                        docker rm -f "$cname" >/dev/null 2>&1
-                        if docker run -d \
-                            --name "$cname" \
-                            --restart unless-stopped \
-                            --log-opt max-size=15m \
-                            --log-opt max-file=3 \
-                            -v "${vname}:/home/conduit/data" \
-                            --network host \
-                            $resource_args \
-                            "$conduit_img" \
-                            start --max-clients "$mc" --bandwidth "$bw" --stats-file >/dev/null 2>&1; then
-                            upd_ok=$((upd_ok + 1))
-                        else
-                            upd_fail=$((upd_fail + 1))
-                        fi
-                    done
-                    # Clean up old dangling images
-                    docker image prune -f >/dev/null 2>&1
-                    if [ "$upd_fail" -eq 0 ]; then
-                        telegram_send "✅ Update complete. ${upd_ok} container(s) recreated with new image."
-                    else
-                        telegram_send "⚠️ Update: ${upd_ok} OK, ${upd_fail} failed."
-                    fi
-                else
-                    telegram_send "✅ Image check complete. No changes detected."
-                fi
+                telegram_send_inline_keyboard "Tap server to update:" "$(_server_kb "up_" "🔄")"
                 ;;
             /qr|/qr@*)
-                if [ "${CONTAINER_COUNT:-1}" -le 1 ]; then
-                    # Single container: generate and send QR directly
-                    local vol=$(get_volume_name 1)
-                    local raw_key=$(get_raw_key "$vol")
-                    local node_id=$(get_node_id "$vol")
-                    if [ -n "$raw_key" ] && command -v qrencode &>/dev/null; then
-                        local hostname_str=$(hostname 2>/dev/null || echo "conduit")
-                        local claim_json="{\"version\":1,\"data\":{\"key\":\"${raw_key}\",\"name\":\"${hostname_str}\"}}"
-                        local claim_b64=$(echo -n "$claim_json" | base64 | tr -d '\n')
-                        local claim_url="network.ryve.app://(app)/conduits?claim=${claim_b64}"
-                        qrencode -t PNG -o /tmp/conduit_qr_1.png "$claim_url" 2>/dev/null
-                        if [ -f /tmp/conduit_qr_1.png ]; then
-                            telegram_send_photo "/tmp/conduit_qr_1.png" "Conduit ID: ${node_id:-unknown}"
-                            rm -f /tmp/conduit_qr_1.png
-                        else
-                            telegram_send "❌ Failed to generate QR code"
-                        fi
-                    elif ! command -v qrencode &>/dev/null; then
-                        telegram_send "❌ qrencode not installed. Install with: apt install qrencode"
-                    else
-                        telegram_send "❌ Key not available. Start container first."
-                    fi
-                else
-                    # Multiple containers: send inline keyboard for selection
-                    local buttons=""
-                    for i in $(seq 1 ${CONTAINER_COUNT:-1}); do
-                        [ -n "$buttons" ] && buttons+=","
-                        buttons+="{\"text\":\"Container ${i}\",\"callback_data\":\"qr_${i}\"}"
-                    done
-                    local kb="{\"inline_keyboard\":[[${buttons}]]}"
-                    telegram_send_inline_keyboard "📱 Select a container for QR code:" "$kb"
-                fi
+                telegram_send_inline_keyboard "Tap server for QR code:" "$(_server_kb "qs_" "📱")"
                 ;;
             /snowflake|/snowflake@*)
                 if [ "$SNOWFLAKE_ENABLED" != "true" ]; then
                     telegram_send "❌ Snowflake proxy is not enabled."
                 else
-                    local _sf_running=false
-                    is_snowflake_running && _sf_running=true
-                    local _sf_status="🔴 Stopped"
-                    [ "$_sf_running" = "true" ] && _sf_status="🟢 Running"
-                    local _sf_count="${SNOWFLAKE_COUNT:-1}"
-                    local _sf_msg="❄️ *Snowflake Proxy*
-Status: ${_sf_status}
-Instances: ${_sf_count}"
-                    local _sf_buttons=""
-                    if [ "$_sf_running" = "true" ]; then
-                        _sf_buttons="{\"text\":\"🛑 Stop\",\"callback_data\":\"sf_stop\"},{\"text\":\"🔄 Restart\",\"callback_data\":\"sf_restart\"}"
-                    else
-                        _sf_buttons="{\"text\":\"▶️ Start\",\"callback_data\":\"sf_start\"}"
-                    fi
-                    local _sf_kb="{\"inline_keyboard\":[[${_sf_buttons}]]}"
-                    telegram_send_inline_keyboard "$_sf_msg" "$_sf_kb"
+                    telegram_send_inline_keyboard "Tap to view Snowflake:" "$(_server_kb "sw_" "❄")"
                 fi
                 ;;
             /proxy|/proxy@*)
                 if [ "$MTPROTO_ENABLED" != "true" ] || [ -z "$MTPROTO_SECRET" ]; then
                     telegram_send "❌ MTProto proxy is not configured."
                 else
-                    local _mt_ip
-                    _mt_ip=$(get_public_ip)
-                    if [ -z "$_mt_ip" ]; then
-                        telegram_send "❌ Could not detect server IP."
-                    else
-                        local _mt_link="tg://proxy?server=${_mt_ip}&port=${MTPROTO_PORT}&secret=${MTPROTO_SECRET}"
-                        local _mt_running=false
-                        docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^mtproto-proxy$" && _mt_running=true
-                        local _mt_status="🔴 Stopped"
-                        [ "$_mt_running" = "true" ] && _mt_status="🟢 Running"
-                        local _mt_t
-                        _mt_t=$(get_mtproto_traffic)
-                        local _mt_dl _mt_ul
-                        read -r _mt_dl _mt_ul <<< "$_mt_t"
-                        local _mt_traffic=""
-                        if [ "${_mt_dl:-0}" -gt 0 ] || [ "${_mt_ul:-0}" -gt 0 ] 2>/dev/null; then
-                            _mt_traffic="
-Traffic: ↓ $(format_bytes ${_mt_dl:-0})  ↑ $(format_bytes ${_mt_ul:-0})"
-                        fi
-                        local _mt_msg="📡 *MTProto Proxy*
-Status: ${_mt_status}
-Server: \`${_mt_ip}\`
-Port: ${MTPROTO_PORT}
-Domain: ${MTPROTO_DOMAIN}${_mt_traffic}
-
-🔗 [Connect to Proxy](${_mt_link})"
-                        # Build inline keyboard for individual control
-                        local _mt_buttons=""
-                        if [ "$_mt_running" = "true" ]; then
-                            _mt_buttons="{\"text\":\"🛑 Stop\",\"callback_data\":\"mt_stop\"},{\"text\":\"🔄 Restart\",\"callback_data\":\"mt_restart\"}"
-                        else
-                            _mt_buttons="{\"text\":\"▶️ Start\",\"callback_data\":\"mt_start\"}"
-                        fi
-                        local _mt_kb="{\"inline_keyboard\":[[${_mt_buttons}]]}"
-                        if command -v qrencode &>/dev/null; then
-                            qrencode -t PNG -o /tmp/mtproto_qr.png "$_mt_link" 2>/dev/null
-                            if [ -f /tmp/mtproto_qr.png ]; then
-                                telegram_send_photo "/tmp/mtproto_qr.png" "$_mt_msg"
-                                rm -f /tmp/mtproto_qr.png
-                            else
-                                telegram_send_inline_keyboard "$_mt_msg" "$_mt_kb"
-                            fi
-                        else
-                            telegram_send_inline_keyboard "$_mt_msg" "$_mt_kb"
-                        fi
-                    fi
+                    telegram_send_inline_keyboard "Tap to view MTProto:" "$(_server_kb "px_" "✉")"
                 fi
                 ;;
             /help|/help@*)
                 telegram_send "📖 *Available Commands*
-/status — Full status report
-/peers — Current peer count
-/uptime — Per-container uptime
-/containers — Per-container status
-/settings — Current configuration
-/health — Run health checks
-/logs\\_N — Last 15 log lines for container N
-/update — Update Docker image
-/qr — QR code for rewards
-/proxy — MTProto proxy (status + control)
-/snowflake — Snowflake proxy (status + control)
-/restart\\_N — Restart container N
-/stop\\_N — Stop container N
-/start\\_N — Start container N
-/restart\\_all — Restart all containers
-/start\\_all — Start all containers
-/stop\\_all — Stop all containers
+
+📊 *Status & Monitoring*
+/status — Full report: peers, uptime, traffic, services
+/peers — Live peer count across all containers
+/uptime — How long each container has been running
+/containers — Per-container status with network stats
+/health — Run health checks on all services
+/logs\\_N — Last 15 log lines for container N (e.g. /logs\\_1)
+
+⚙️ *Configuration*
+/settings — View current configuration and limits
+/update — Pull latest Docker image and recreate containers
+
+🔌 *Add-on Services*
+/proxy — MTProto proxy status, traffic stats, and connect link
+/snowflake — Snowflake proxy status and instance count
+/qr — Generate QR code for Psiphon rewards page
+
+🔧 *Container Control*
+/start\\_N — Start a specific container (e.g. /start\\_1)
+/stop\\_N — Stop a specific container (e.g. /stop\\_1)
+/restart\\_N — Restart a specific container (e.g. /restart\\_1)
+/start\\_all — Start all containers and services
+/stop\\_all — Stop all containers and services
+/restart\\_all — Restart all containers and services
+
 /help — Show this help"
                 ;;
         esac
@@ -7707,7 +7930,7 @@ build_report() {
     report+=$'\n'
 
     # Container status + uptime
-    local running=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -c "^conduit" 2>/dev/null || true)
+    local running=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -cE "^conduit(-[0-9]+)?$" 2>/dev/null || true)
     running=${running:-0}
     local total=${CONTAINER_COUNT:-1}
     report+="📦 Containers: ${running}/${total} running"
@@ -7799,11 +8022,13 @@ build_report() {
     # System CPU + Temp
     local sys_cpu="N/A"
     if [ -f /proc/stat ]; then
+        local _c user nice system idle iowait irq softirq steal guest
         read -r _c user nice system idle iowait irq softirq steal guest < /proc/stat
         local total_curr=$((user + nice + system + idle + iowait + irq + softirq + steal))
         local work_curr=$((user + nice + system + irq + softirq + steal))
         local cpu_tmp="/tmp/conduit_cpu_state"
         if [ -f "$cpu_tmp" ]; then
+            local total_prev work_prev
             read -r total_prev work_prev < "$cpu_tmp"
             local total_delta=$((total_curr - total_prev))
             local work_delta=$((work_curr - work_prev))
@@ -7850,8 +8075,8 @@ build_report() {
     # Data usage
     if [ "${DATA_CAP_GB:-0}" -gt 0 ] || [ "${DATA_CAP_UP_GB:-0}" -gt 0 ] || [ "${DATA_CAP_DOWN_GB:-0}" -gt 0 ]; then
         local iface="${DATA_CAP_IFACE:-eth0}"
-        local rx=$(cat /sys/class/net/$iface/statistics/rx_bytes 2>/dev/null || echo 0)
-        local tx=$(cat /sys/class/net/$iface/statistics/tx_bytes 2>/dev/null || echo 0)
+        local rx=$(cat "/sys/class/net/$iface/statistics/rx_bytes" 2>/dev/null || echo 0)
+        local tx=$(cat "/sys/class/net/$iface/statistics/tx_bytes" 2>/dev/null || echo 0)
         local d_rx=$(( rx - ${DATA_CAP_BASELINE_RX:-0} )); [ "$d_rx" -lt 0 ] && d_rx=0
         local d_tx=$(( tx - ${DATA_CAP_BASELINE_TX:-0} )); [ "$d_tx" -lt 0 ] && d_tx=0
         local t_rx=$(( d_rx + ${DATA_CAP_PRIOR_RX:-0} ))
@@ -7942,7 +8167,7 @@ build_report() {
         read -r _mt_dl _mt_ul <<< "$_mt_t"
         local mt_dl_fmt=$(format_bytes ${_mt_dl:-0})
         local mt_ul_fmt=$(format_bytes ${_mt_ul:-0})
-        report+="📡 MTProxy: Running | ↓${mt_dl_fmt} ↑${mt_ul_fmt}"
+        report+="✉️ MTProxy: Running | ↓${mt_dl_fmt} ↑${mt_ul_fmt}"
         report+=$'\n'
     fi
 
@@ -8381,8 +8606,7 @@ show_settings_menu() {
                 redraw=true
                 ;;
             u)
-                uninstall_all
-                exit 0
+                uninstall_all && exit 0
                 ;;
             0)
                 return
@@ -8776,7 +9000,7 @@ SVCEOF
     fi
 
     # Auto-start/upgrade tracker if containers are up
-    local any_running=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -c "^conduit" 2>/dev/null || true)
+    local any_running=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -cE "^conduit(-[0-9]+)?$" 2>/dev/null || true)
     any_running=${any_running:-0}
     if [ "$any_running" -gt 0 ] 2>/dev/null; then
         local tracker_script="$INSTALL_DIR/conduit-tracker.sh"
@@ -8829,7 +9053,7 @@ SVCEOF
         # If API unreachable — do nothing, badge stays as-is
     } &
 
-    local redraw=true
+    local redraw=true choice
     while true; do
         if [ "$redraw" = true ]; then
             clear
@@ -8861,6 +9085,7 @@ SVCEOF
             echo -e "  c. 📦 Manage containers"
             echo -e "  a. 📊 Advanced stats"
             echo -e "  m. 🌐 Multi-server dashboard"
+            echo ""
             # Snowflake menu item
             if [ "$SNOWFLAKE_ENABLED" = "true" ]; then
                 local _sf_label="${RED}Stopped${NC}"
@@ -8873,10 +9098,15 @@ SVCEOF
             if [ "$MTPROTO_ENABLED" = "true" ]; then
                 local _mt_label="${RED}Stopped${NC}"
                 is_mtproto_running && _mt_label="${GREEN}Running${NC}"
-                echo -e "  p. 📡 Telegram MTProto Proxy [${_mt_label}]"
+                echo -e "  p. ✉️  Telegram MTProto Proxy [${_mt_label}]"
             else
-                echo -e "  p. 📡 Telegram MTProto Proxy"
+                echo -e "  p. ✉️  Telegram MTProto Proxy"
             fi
+            echo ""
+            echo -e "  ${CYAN}n${NC}. 📡 Psiphon Network Stats"
+            echo -e "  ${CYAN}e${NC}. 📈 Iran Connectivity Status"
+            echo -e "  ${CYAN}t${NC}. 🔗 Iran Connectivity Test"
+            echo ""
             echo -e "  i. ℹ️  Info & Help"
             echo -e "  0. 🚪 Exit"
             echo -e "${CYAN}─────────────────────────────────────────────────────────────────${NC}"
@@ -8951,6 +9181,18 @@ SVCEOF
                 show_info_menu
                 redraw=true
                 ;;
+            n|N)
+                show_psiphon_stats
+                redraw=true
+                ;;
+            e|E)
+                show_iran_connectivity
+                redraw=true
+                ;;
+            t|T)
+                show_iran_test
+                redraw=true
+                ;;
             0)
                 echo "Exiting."
                 exit 0
@@ -8966,25 +9208,35 @@ SVCEOF
 
 # Info hub - sub-page menu
 show_info_menu() {
-    local redraw=true
+    local redraw=true info_choice
     while true; do
         if [ "$redraw" = true ]; then
             clear
             echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
             echo -e "${BOLD}  INFO & HELP${NC}"
             echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
-            echo ""
+            echo -e "  ${DIM}── Understanding Conduit ──${NC}"
             echo -e "  1. 📡 How the Tracker Works"
             echo -e "  2. 📊 Understanding the Stats Pages"
             echo -e "  3. 📦 Containers & Scaling"
-            echo -e "  4. 🔒 Privacy & Security"
-            echo -e "  5. ❄️  Snowflake Proxy"
-            echo -e "  6. 📡 MTProto Proxy"
-            echo -e "  7. ⚖️  Safety & Legal"
-            echo -e "  8. 🚀 About Psiphon Conduit"
-            echo -e "  9. 📈 Dashboard Metrics Explained"
+            echo -e "  4. 🖥️  Dashboard Metrics Explained"
             echo ""
-            echo -e "  [b] Back to menu"
+            echo -e "  ${DIM}── Proxies & Privacy ──${NC}"
+            echo -e "  5. 🔒 Privacy & Security"
+            echo -e "  6. ❄️  Snowflake Proxy"
+            echo -e "  7. ✉️  MTProto Proxy"
+            echo ""
+            echo -e "  ${DIM}── Iran & Network ──${NC}"
+            echo -e "  8. 📈 Iran Connectivity — Data Sources"
+            echo -e "  9. 🔗 Iran Connectivity Test — Guide"
+            echo -e "  a. 📶 Psiphon Network Stats — Guide"
+            echo ""
+            echo -e "  ${DIM}── Reference ──${NC}"
+            echo -e "  b. ⚖️  Safety & Legal"
+            echo -e "  c. 💻 CLI Commands Reference"
+            echo -e "  d. 🚀 About Psiphon Conduit"
+            echo ""
+            echo -e "  [0] Back to menu"
             echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
             echo ""
             redraw=false
@@ -8994,13 +9246,17 @@ show_info_menu() {
             1) _info_tracker; redraw=true ;;
             2) _info_stats; redraw=true ;;
             3) _info_containers; redraw=true ;;
-            4) _info_privacy; redraw=true ;;
-            5) show_info_snowflake; redraw=true ;;
-            6) show_info_mtproto; redraw=true ;;
-            7) show_info_safety; redraw=true ;;
-            8) show_about; redraw=true ;;
-            9) show_dashboard_info; redraw=true ;;
-            b|"") break ;;
+            4) show_dashboard_info; redraw=true ;;
+            5) _info_privacy; redraw=true ;;
+            6) show_info_snowflake; redraw=true ;;
+            7) show_info_mtproto; redraw=true ;;
+            8) _info_iran_connectivity; redraw=true ;;
+            9) _info_iran_test; redraw=true ;;
+            a) _info_psiphon_stats; redraw=true ;;
+            b) show_info_safety; redraw=true ;;
+            c) _info_cli_commands; redraw=true ;;
+            d) show_about; redraw=true ;;
+            0|"") break ;;
             *) echo -e "  ${RED}Invalid.${NC}"; sleep 1; redraw=true ;;
         esac
     done
@@ -9149,6 +9405,3207 @@ _info_privacy() {
     read -n 1 -s -r -p "  Press any key to return..." < /dev/tty || true
 }
 
+_info_iran_connectivity() {
+    local _info_exit=0
+    while [ "$_info_exit" -eq 0 ]; do
+        clear
+        echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+        echo -e "${BOLD}  IRAN CONNECTIVITY — DATA SOURCES & METRICS${NC}"
+        echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+        echo ""
+        echo -e "  The Iran Connectivity Status page aggregates real-time"
+        echo -e "  data from multiple independent sources. Select a topic"
+        echo -e "  below to learn how each metric is measured and displayed."
+        echo ""
+        echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
+        echo -e "  ${CYAN}a.${NC} ${BOLD}IODA — Internet Outage Detection${NC}"
+        echo -e "     ${DIM}BGP Reachability, Active Probing, Outage Alerts${NC}"
+        echo ""
+        echo -e "  ${CYAN}b.${NC} ${BOLD}IODA — Additional Signals${NC}"
+        echo -e "     ${DIM}Darknet Traffic, Google Search Traffic, Latency & Loss${NC}"
+        echo ""
+        echo -e "  ${CYAN}c.${NC} ${BOLD}OONI — Messaging Apps${NC}"
+        echo -e "     ${DIM}Telegram, WhatsApp, Signal, Facebook Messenger${NC}"
+        echo ""
+        echo -e "  ${CYAN}d.${NC} ${BOLD}OONI — Network Anomaly Trend${NC}"
+        echo -e "     ${DIM}Web censorship detection across thousands of URLs${NC}"
+        echo ""
+        echo -e "  ${CYAN}e.${NC} ${BOLD}RIPE Atlas — Probe Connectivity${NC}"
+        echo -e "     ${DIM}Hardware probes reporting from inside Iran${NC}"
+        echo ""
+        echo -e "  ${CYAN}f.${NC} ${BOLD}irinter.net — Internet Exchange Score${NC}"
+        echo -e "     ${DIM}Domestic exchange point health monitoring${NC}"
+        echo ""
+        echo -e "  ${CYAN}g.${NC} ${BOLD}Status Indicator & Data Freshness${NC}"
+        echo -e "     ${DIM}How the status badge works, caching, auto-refresh${NC}"
+        echo ""
+        echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "  ${CYAN}[0]${NC} Back"
+        echo ""
+        printf "  Select topic: "
+        local _ic=""
+        read -n 1 -s -r _ic < /dev/tty || true
+        echo ""
+        case "$_ic" in
+            a|A) _info_ic_ioda_core ;;
+            b|B) _info_ic_ioda_extra ;;
+            c|C) _info_ic_ooni_msg ;;
+            d|D) _info_ic_ooni_anomaly ;;
+            e|E) _info_ic_ripe ;;
+            f|F) _info_ic_irinter ;;
+            g|G) _info_ic_status ;;
+            *) _info_exit=1 ;;
+        esac
+    done
+}
+
+# --- Info sub-pages (each returns to the menu) ---
+
+_info_ic_ioda_core() {
+    clear
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  IODA — Internet Outage Detection & Analysis${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "  ${DIM}Source: Georgia Tech · ioda.inetintel.cc.gatech.edu${NC}"
+    echo -e "  ${DIM}Access: Public API, no authentication required${NC}"
+    echo ""
+    echo -e "  IODA (Internet Outage Detection & Analysis) is a project by"
+    echo -e "  Georgia Tech that monitors global internet connectivity using"
+    echo -e "  multiple independent measurement methods. We query their API"
+    echo -e "  for Iran (country code IR) over the last 7 days."
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${GREEN}Internet Reachability (BGP)${NC}"
+    echo ""
+    echo -e "  Tracks how many IP address blocks (prefixes) are visible in"
+    echo -e "  the global routing table for Iran. When the government shuts"
+    echo -e "  down the internet, BGP prefixes disappear from the global"
+    echo -e "  routing table — this is the most reliable signal for"
+    echo -e "  large-scale shutdowns."
+    echo ""
+    echo -e "  The chart shows daily values normalized to the 7-day peak"
+    echo -e "  (highest day = 100%). This normalization makes drops clearly"
+    echo -e "  visible regardless of the absolute number of prefixes."
+    echo ""
+    echo -e "  ${DIM}API: /v2/signals/raw/country/IR?datasource=bgp&maxPoints=7${NC}"
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${CYAN}Active Probing (Ping)${NC}"
+    echo ""
+    echo -e "  IODA sends ping probes to /24 subnets (256-address blocks)"
+    echo -e "  inside Iran and measures how many respond. This complements"
+    echo -e "  BGP: a network can be routed (BGP visible) but still"
+    echo -e "  unreachable (probes fail) during throttling or partial"
+    echo -e "  filtering. When both BGP and ping drop together, it's a"
+    echo -e "  strong confirmation of a full shutdown."
+    echo ""
+    echo -e "  ${DIM}API: /v2/signals/raw/country/IR?datasource=ping-slash24&maxPoints=7${NC}"
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${YELLOW}Recent Outage Alerts${NC}"
+    echo ""
+    echo -e "  IODA automatically detects significant drops in any of its"
+    echo -e "  signals and generates alerts. Each alert includes:"
+    echo ""
+    echo -e "  ${BOLD}Date${NC}       When the outage was detected"
+    echo -e "  ${BOLD}Source${NC}     Which signal triggered it (bgp, ping, etc.)"
+    echo -e "  ${BOLD}Level${NC}     Severity: ${YELLOW}warning${NC}, ${YELLOW}major${NC}, or ${RED}critical${NC}"
+    echo -e "  ${BOLD}Condition${NC}  Whether the alert is ongoing or resolved"
+    echo ""
+    echo -e "  If you see alerts here, Iran is likely experiencing or has"
+    echo -e "  recently experienced an active internet disruption."
+    echo ""
+    echo -e "  ${DIM}API: /v2/outages/alerts?entityType=country&entityCode=IR${NC}"
+    echo ""
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    read -n 1 -s -r -p "  Press any key to return to menu..." < /dev/tty || true
+}
+
+_info_ic_ioda_extra() {
+    clear
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  IODA — Additional Signals${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "  ${DIM}Source: Georgia Tech · Same IODA API, different datasources${NC}"
+    echo ""
+    echo -e "  Beyond BGP and ping, IODA collects several other independent"
+    echo -e "  signals that confirm or reveal different types of disruption."
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${MAGENTA}Darknet Traffic (Merit Network Telescope)${NC}"
+    echo ""
+    echo -e "  The Merit Network Telescope observes unsolicited background"
+    echo -e "  traffic (backscatter, scanning, spoofed packets) arriving"
+    echo -e "  from Iran's IP address space. During normal operation this"
+    echo -e "  traffic is steady. During a shutdown it drops sharply —"
+    echo -e "  providing strong independent confirmation of outages even"
+    echo -e "  when BGP routing tables look normal."
+    echo ""
+    echo -e "  Chart shows raw daily traffic volume (not normalized)."
+    echo ""
+    echo -e "  ${DIM}API: /v2/signals/raw/country/IR?datasource=merit-nt&maxPoints=7${NC}"
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${YELLOW}Google Search Traffic (Google Transparency Report)${NC}"
+    echo ""
+    echo -e "  Tracks the volume of Google product requests (Search,"
+    echo -e "  YouTube, Gmail, Maps, etc.) originating from Iran. Google"
+    echo -e "  publishes this data through their Transparency Report."
+    echo -e "  Sudden drops indicate internet disruption or targeted"
+    echo -e "  filtering of Google services. This signal can detect"
+    echo -e "  content-level blocking that BGP and ping measurements miss."
+    echo ""
+    echo -e "  Chart shows raw daily request volume."
+    echo ""
+    echo -e "  ${DIM}API: /v2/signals/raw/country/IR?datasource=gtr&maxPoints=7${NC}"
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${GREEN}Network Quality (Latency & Packet Loss)${NC}"
+    echo ""
+    echo -e "  IODA's active probing infrastructure also measures the"
+    echo -e "  round-trip latency (in milliseconds) and packet loss (%)"
+    echo -e "  to Iranian networks. These metrics reveal throttling or"
+    echo -e "  congestion even when connectivity appears normal."
+    echo ""
+    echo -e "  ${BOLD}Avg Latency${NC}  Median round-trip time to Iranian /24 subnets"
+    echo -e "              ${GREEN}< 200ms${NC} good  |  ${YELLOW}200-500ms${NC} slow  |  ${RED}>500ms${NC} degraded"
+    echo -e "  ${BOLD}Packet Loss${NC}  % of probes that received no response"
+    echo -e "              ${GREEN}< 3%${NC} normal  |  ${YELLOW}3-10%${NC} elevated  |  ${RED}>10%${NC} severe"
+    echo ""
+    echo -e "  ${DIM}API: /v2/signals/raw/country/IR?datasource=ping-slash24-latency${NC}"
+    echo -e "  ${DIM}API: /v2/signals/raw/country/IR?datasource=ping-slash24-loss${NC}"
+    echo ""
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    read -n 1 -s -r -p "  Press any key to return to menu..." < /dev/tty || true
+}
+
+_info_ic_ooni_msg() {
+    clear
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  OONI — Messaging App Reachability${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "  ${DIM}Source: ooni.org · Same OONI infrastructure${NC}"
+    echo ""
+    echo -e "  OONI volunteers also test popular messaging apps from inside"
+    echo -e "  Iran. Each app has a dedicated test that checks whether the"
+    echo -e "  service's servers are reachable. The table format is identical"
+    echo -e "  to the Circumvention Tools table:"
+    echo -e "  Success% = ok_count / measurement_count * 100"
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${BOLD}Telegram${NC}"
+    echo ""
+    echo -e "  Tests connections to Telegram's web interface, API endpoints,"
+    echo -e "  and data centers. Checks if Telegram servers (149.154.*.*/32)"
+    echo -e "  are reachable via TCP and if the web interface (web.telegram"
+    echo -e "  .org) responds correctly."
+    echo ""
+    echo -e "  ${DIM}API: api.ooni.io/api/v1/aggregation?probe_cc=IR&test_name=telegram${NC}"
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${BOLD}WhatsApp${NC}"
+    echo ""
+    echo -e "  Tests TCP connections to WhatsApp's registration service"
+    echo -e "  endpoints and the web interface (web.whatsapp.com). An"
+    echo -e "  anomaly means either the backend or web interface is blocked."
+    echo ""
+    echo -e "  ${DIM}API: api.ooni.io/api/v1/aggregation?probe_cc=IR&test_name=whatsapp${NC}"
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${BOLD}Signal${NC}"
+    echo ""
+    echo -e "  Tests access to Signal's servers by attempting to establish"
+    echo -e "  a TLS connection. An anomaly indicates the service is being"
+    echo -e "  blocked or interfered with at the network level."
+    echo ""
+    echo -e "  ${DIM}API: api.ooni.io/api/v1/aggregation?probe_cc=IR&test_name=signal${NC}"
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${BOLD}Facebook Messenger${NC}"
+    echo ""
+    echo -e "  Tests TCP connections to Facebook Messenger's backend servers"
+    echo -e "  (edge-star, b-api, etc.) and checks DNS resolution. An"
+    echo -e "  anomaly means Facebook's messaging infrastructure is blocked."
+    echo ""
+    echo -e "  ${DIM}API: api.ooni.io/api/v1/aggregation?probe_cc=IR${NC}"
+    echo -e "  ${DIM}     &test_name=facebook_messenger${NC}"
+    echo ""
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    read -n 1 -s -r -p "  Press any key to return to menu..." < /dev/tty || true
+}
+
+_info_ic_ooni_anomaly() {
+    clear
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  OONI — Network Anomaly Trend${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "  ${DIM}Source: ooni.org · web_connectivity test${NC}"
+    echo ""
+    echo -e "  This chart shows the daily percentage of OONI web tests that"
+    echo -e "  detected anomalies (possible censorship) in Iran."
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${YELLOW}How it works${NC}"
+    echo ""
+    echo -e "  Uses the ${BOLD}web_connectivity${NC} test — OONI's main censorship"
+    echo -e "  detector. Volunteers test thousands of URLs from Iran and"
+    echo -e "  OONI checks for four types of interference:"
+    echo ""
+    echo -e "    1. ${BOLD}DNS tampering${NC}    — DNS responses differ from control"
+    echo -e "    2. ${BOLD}TCP/IP blocking${NC} — TCP connections to the site are reset"
+    echo -e "    3. ${BOLD}HTTP difference${NC} — Response content doesn't match"
+    echo -e "    4. ${BOLD}TLS interference${NC} — TLS handshake is disrupted"
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${YELLOW}How the chart is calculated${NC}"
+    echo ""
+    echo -e "  We request hourly buckets from the OONI API with each"
+    echo -e "  bucket containing anomaly_count and measurement_count."
+    echo -e "  We aggregate these into daily percentages:"
+    echo ""
+    echo -e "  Anomaly % = daily_anomaly_count / daily_measurement_count"
+    echo ""
+    echo -e "  ${DIM}API: api.ooni.io/api/v1/aggregation?probe_cc=IR${NC}"
+    echo -e "  ${DIM}&test_name=web_connectivity&axis_x=measurement_start_day${NC}"
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${YELLOW}How to read it${NC}"
+    echo ""
+    echo -e "  Higher bars = more censorship/filtering activity detected."
+    echo -e "  Spikes indicate new blocking campaigns or tighter"
+    echo -e "  restrictions. A baseline of 10-20% is typical for Iran."
+    echo -e "  Drops to near 0% during shutdowns (no tests can run)."
+    echo -e "  Spikes above 50% indicate aggressive new filtering."
+    echo ""
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    read -n 1 -s -r -p "  Press any key to return to menu..." < /dev/tty || true
+}
+
+_info_ic_ripe() {
+    clear
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  RIPE Atlas — Probe Connectivity${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "  ${DIM}Source: atlas.ripe.net · RIPE NCC${NC}"
+    echo -e "  ${DIM}Access: Public API, no authentication required${NC}"
+    echo ""
+    echo -e "  RIPE Atlas is a global network of small hardware probes"
+    echo -e "  hosted by volunteers. These probes perform internet"
+    echo -e "  measurements (ping, traceroute, DNS, TLS) and report back"
+    echo -e "  to RIPE NCC. There are currently ~100+ probes in Iran."
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${GREEN}What we show${NC}"
+    echo ""
+    echo -e "  We query the RIPE Atlas API for probe status in Iran:"
+    echo ""
+    echo -e "  ${GREEN}Connected${NC}     Probes that are online and reporting to RIPE"
+    echo -e "  ${DIM}Disconnected${NC}  Probes that have lost internet connectivity"
+    echo ""
+    echo -e "  The percentage (connected / total) gives a ground-level"
+    echo -e "  view of connectivity. A sudden increase in disconnected"
+    echo -e "  probes indicates localized or national disruption."
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${GREEN}Color thresholds${NC}"
+    echo ""
+    echo -e "  ${GREEN}>= 70%${NC} connected — Normal connectivity"
+    echo -e "  ${YELLOW}40-70%${NC} connected — Significant disruption"
+    echo -e "  ${RED}< 40%${NC}  connected — Major outage"
+    echo ""
+    echo -e "  ${DIM}API: atlas.ripe.net/api/v2/probes/?country_code=IR&status=1${NC}"
+    echo -e "  ${DIM}API: atlas.ripe.net/api/v2/probes/?country_code=IR&status=2${NC}"
+    echo ""
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    read -n 1 -s -r -p "  Press any key to return to menu..." < /dev/tty || true
+}
+
+_info_ic_irinter() {
+    clear
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  irinter.net — Internet Exchange Score${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "  ${DIM}Source: irinter.net · Iran Internet Exchange Point${NC}"
+    echo -e "  ${DIM}Access: Public API, no authentication required${NC}"
+    echo ""
+    echo -e "  irinter.net monitors Iran's domestic internet exchange"
+    echo -e "  infrastructure. Iranian ISPs exchange traffic domestically"
+    echo -e "  through internet exchange points (IXPs) — when these are"
+    echo -e "  healthy, domestic traffic flows efficiently."
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${GREEN}Network Score${NC}"
+    echo ""
+    echo -e "  The score is a 0-100% health metric for Iran's domestic"
+    echo -e "  internet exchange. Higher = healthier."
+    echo ""
+    echo -e "  ${GREEN}>= 70%${NC}  — Healthy domestic exchange"
+    echo -e "  ${YELLOW}40-70%${NC}  — Degraded performance or congestion"
+    echo -e "  ${RED}< 40%${NC}   — Severe problems at exchange points"
+    echo ""
+    echo -e "  Drops indicate domestic routing problems, exchange point"
+    echo -e "  congestion, or deliberate throttling of domestic traffic."
+    echo -e "  This metric specifically captures domestic infrastructure"
+    echo -e "  issues that international measurements might miss."
+    echo ""
+    echo -e "  We fetch 7 days of data and display the most recent score."
+    echo ""
+    echo -e "  ${DIM}API: irinter.net/api/data/network-score?from=<epoch>&until=<epoch>${NC}"
+    echo -e "  ${DIM}Response: {\"data\":[{\"from\":...,\"value\":65.02},...]}}${NC}"
+    echo ""
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    read -n 1 -s -r -p "  Press any key to return to menu..." < /dev/tty || true
+}
+
+_info_ic_tor() {
+    # Reserved for future Tor relay integration
+    return 0
+}
+
+_info_ic_status() {
+    clear
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  Status Indicator & Data Freshness${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${BOLD}Status Indicator${NC}"
+    echo ""
+    echo -e "  The colored badge at the top of the status page is derived"
+    echo -e "  from the latest IODA BGP visibility value, normalized as a"
+    echo -e "  percentage of the 7-day peak:"
+    echo ""
+    echo -e "    ${GREEN}● ONLINE${NC}     >= 80% of peak — Normal connectivity"
+    echo -e "    ${YELLOW}● DISRUPTED${NC}  40-80% of peak — Partial shutdown or throttle"
+    echo -e "    ${RED}● OUTAGE${NC}     < 40% of peak  — Major shutdown detected"
+    echo ""
+    echo -e "  BGP visibility is used because it's the most reliable and"
+    echo -e "  tamper-resistant signal — it's measured from outside Iran"
+    echo -e "  by observing the global routing table, so it can't be"
+    echo -e "  spoofed or manipulated by Iranian authorities."
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${BOLD}Data Freshness & Caching${NC}"
+    echo ""
+    echo -e "  All data is cached locally for ${BOLD}5 minutes${NC} to avoid"
+    echo -e "  excessive API calls. The \"Updated: Xm ago\" label at the"
+    echo -e "  top shows the age of the oldest cached data."
+    echo ""
+    echo -e "  ${BOLD}Auto-refresh${NC}: The page automatically refreshes when the"
+    echo -e "  cache expires (every 5 minutes)."
+    echo ""
+    echo -e "  ${BOLD}Manual refresh${NC}: Press ${CYAN}[r]${NC} to force an immediate refresh,"
+    echo -e "  bypassing the cache."
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${BOLD}Data Sources Summary${NC}"
+    echo ""
+    echo -e "  ${GREEN}IODA${NC}         Georgia Tech — BGP, Ping, Alerts, Darknet,"
+    echo -e "              Google Traffic, Latency, Packet Loss"
+    echo -e "  ${GREEN}OONI${NC}         Volunteer network — Psiphon, Tor, Messaging"
+    echo -e "              Apps (Telegram/WhatsApp/Signal/Facebook),"
+    echo -e "              Web Anomaly Trend"
+    echo -e "  ${GREEN}RIPE Atlas${NC}   RIPE NCC — Hardware probe connectivity"
+    echo -e "  ${GREEN}irinter.net${NC}  Iran IXP — Domestic exchange health score"
+    echo ""
+    echo -e "  All sources are public APIs with no authentication"
+    echo -e "  required. Data is fetched in parallel for fast loading."
+    echo ""
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    read -n 1 -s -r -p "  Press any key to return to menu..." < /dev/tty || true
+}
+
+#═══════════════════════════════════════════════════════════════════════
+# Info pages: Iran Connectivity Test
+#═══════════════════════════════════════════════════════════════════════
+
+_info_iran_test() {
+    local _info_exit=0
+    while [ "$_info_exit" -eq 0 ]; do
+        clear
+        echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+        echo -e "${BOLD}  IRAN CONNECTIVITY TEST — GUIDE${NC}"
+        echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+        echo ""
+        echo -e "  This tool tests live network connectivity from your server"
+        echo -e "  to ~100 endpoints across Iran. Select a topic below."
+        echo ""
+        echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
+        echo -e "  ${CYAN}a.${NC} ${BOLD}Quick Ping & Full Ping${NC}"
+        echo -e "     ${DIM}How ping tests work, what the results mean${NC}"
+        echo ""
+        echo -e "  ${CYAN}b.${NC} ${BOLD}Test by City & Test by ASN${NC}"
+        echo -e "     ${DIM}Filtered testing for targeted diagnostics${NC}"
+        echo ""
+        echo -e "  ${CYAN}c.${NC} ${BOLD}Traceroute & MTR Analysis${NC}"
+        echo -e "     ${DIM}Network path tracing and hop-by-hop analysis${NC}"
+        echo ""
+        echo -e "  ${CYAN}d.${NC} ${BOLD}Full Report${NC}"
+        echo -e "     ${DIM}Comprehensive report with city & ASN breakdown${NC}"
+        echo ""
+        echo -e "  ${CYAN}e.${NC} ${BOLD}Server List & Coverage${NC}"
+        echo -e "     ${DIM}What endpoints are tested and why${NC}"
+        echo ""
+        echo -e "  ${CYAN}f.${NC} ${BOLD}Reading the Results${NC}"
+        echo -e "     ${DIM}Color codes, latency thresholds, loss interpretation${NC}"
+        echo ""
+        echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "  ${CYAN}[0]${NC} Back"
+        echo ""
+        printf "  Select topic: "
+        local _ic=""
+        read -n 1 -s -r _ic < /dev/tty || true
+        echo ""
+        case "$_ic" in
+            a|A) _info_it_ping ;;
+            b|B) _info_it_filter ;;
+            c|C) _info_it_trace ;;
+            d|D) _info_it_report ;;
+            e|E) _info_it_servers ;;
+            f|F) _info_it_results ;;
+            *) _info_exit=1 ;;
+        esac
+    done
+}
+
+_info_it_ping() {
+    clear
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  Quick Ping & Full Ping${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${GREEN}Quick Ping Test (option a)${NC}"
+    echo ""
+    echo -e "  Sends ${BOLD}1 ICMP ping${NC} to every server in the list. All pings"
+    echo -e "  run in parallel (background processes), so testing ~100"
+    echo -e "  servers takes only a few seconds."
+    echo ""
+    echo -e "  Best for: Fast overview of which Iranian networks are"
+    echo -e "  reachable from your server right now."
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${GREEN}Full Ping Test (option b)${NC}"
+    echo ""
+    echo -e "  Sends ${BOLD}4 ICMP pings${NC} to every server. This gives more"
+    echo -e "  reliable latency averages and packet loss statistics"
+    echo -e "  by reducing the impact of single-packet anomalies."
+    echo ""
+    echo -e "  The average latency shown is computed from all successful"
+    echo -e "  replies: ${DIM}rtt min/avg/max/mdev${NC}"
+    echo ""
+    echo -e "  Best for: Accurate latency comparison when you need"
+    echo -e "  reliable numbers for troubleshooting."
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${GREEN}How it works internally${NC}"
+    echo ""
+    echo -e "  1. Creates a temp directory for results"
+    echo -e "  2. For each server: ${DIM}ping -c N -W 3 <IP> &${NC}"
+    echo -e "  3. ${DIM}wait${NC} — waits for all background pings to finish"
+    echo -e "  4. Parses each result file for avg latency and loss %"
+    echo -e "  5. Displays sorted by city with color-coded status"
+    echo ""
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    read -n 1 -s -r -p "  Press any key to return to menu..." < /dev/tty || true
+}
+
+_info_it_filter() {
+    clear
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  Test by City & Test by ASN${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${GREEN}Test by City (option c)${NC}"
+    echo ""
+    echo -e "  Shows a numbered menu of all cities in the server list"
+    echo -e "  with the count of servers in each. Select a city and"
+    echo -e "  the tool runs a 4-ping test only on servers in that city."
+    echo ""
+    echo -e "  Use case: You notice high latency to Mashhad — test just"
+    echo -e "  Mashhad servers to see if it's a regional routing issue."
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${GREEN}Test by ASN (option d)${NC}"
+    echo ""
+    echo -e "  Shows a numbered menu of all ASNs (Autonomous Systems)"
+    echo -e "  with their names and server counts. Select an ASN and"
+    echo -e "  the tool tests only servers on that network."
+    echo ""
+    echo -e "  ${BOLD}What is an ASN?${NC}"
+    echo -e "  An Autonomous System Number identifies a network operator."
+    echo -e "  Each ISP, data center, and large organization has one."
+    echo -e "  For example:"
+    echo -e "    AS12880 = DCI (Data Communication Iran)"
+    echo -e "    AS44244 = Irancell (mobile operator)"
+    echo -e "    AS197207 = MCI (mobile operator)"
+    echo -e "    AS31549 = Shatel (major ISP)"
+    echo ""
+    echo -e "  Use case: You suspect a specific Iranian ISP is blocking"
+    echo -e "  traffic — test only that ASN to confirm."
+    echo ""
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    read -n 1 -s -r -p "  Press any key to return to menu..." < /dev/tty || true
+}
+
+_info_it_trace() {
+    clear
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  Traceroute & MTR Analysis${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${GREEN}Traceroute (option e)${NC}"
+    echo ""
+    echo -e "  Pick a server from a numbered list, then runs:"
+    echo -e "  ${DIM}traceroute -m 25 -w 3 <IP>${NC}"
+    echo ""
+    echo -e "  Shows every network hop between your server and the"
+    echo -e "  target. Each line shows the hop number, router IP/name,"
+    echo -e "  and round-trip time for 3 probes."
+    echo ""
+    echo -e "  ${BOLD}What to look for:${NC}"
+    echo -e "  - ${BOLD}* * *${NC}  = hop doesn't respond (firewalled, normal)"
+    echo -e "  - ${BOLD}Sudden latency jump${NC} = bottleneck at that hop"
+    echo -e "  - ${BOLD}!H / !N${NC} = host/network unreachable"
+    echo -e "  - Last responding hop before ${BOLD}* * *${NC} = where blocking"
+    echo -e "    likely occurs"
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${GREEN}MTR Analysis (option f)${NC}"
+    echo ""
+    echo -e "  Pick a server, then runs:"
+    echo -e "  ${DIM}mtr -r -c 10 -w <IP>${NC}"
+    echo ""
+    echo -e "  MTR combines traceroute + continuous ping into one tool."
+    echo -e "  It sends 10 rounds of probes and shows per-hop stats:"
+    echo ""
+    echo -e "    ${BOLD}Loss%${NC}  Packet loss at each hop"
+    echo -e "    ${BOLD}Snt${NC}    Packets sent (10)"
+    echo -e "    ${BOLD}Last${NC}   Last probe round-trip time"
+    echo -e "    ${BOLD}Avg${NC}    Average RTT across all probes"
+    echo -e "    ${BOLD}Best${NC}   Minimum RTT (best case)"
+    echo -e "    ${BOLD}Wrst${NC}   Maximum RTT (worst case)"
+    echo -e "    ${BOLD}StDev${NC}  Standard deviation (jitter)"
+    echo ""
+    echo -e "  ${BOLD}Tip:${NC} High loss at an intermediate hop but 0% loss at"
+    echo -e "  the final destination is normal — many routers deprioritize"
+    echo -e "  ICMP responses. Only worry if the ${BOLD}final hop${NC} shows loss."
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${GREEN}Dependencies${NC}"
+    echo ""
+    echo -e "  Both tools require ${BOLD}traceroute${NC} and ${BOLD}mtr${NC} packages. The"
+    echo -e "  script auto-installs them via apt/yum/apk/dnf/pacman"
+    echo -e "  when you first open the Iran Connectivity Test page."
+    echo ""
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    read -n 1 -s -r -p "  Press any key to return to menu..." < /dev/tty || true
+}
+
+_info_it_report() {
+    clear
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  Full Report${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "  The Full Report (option g) runs a comprehensive 4-ping"
+    echo -e "  test against all servers, then generates a detailed"
+    echo -e "  breakdown in four sections:"
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${GREEN}1. Overview${NC}"
+    echo -e "  Total reachable servers, average latency, best/worst"
+    echo -e "  server with latency values, overall reachability bar."
+    echo ""
+    echo -e "  ${GREEN}2. By City${NC}"
+    echo -e "  Each city gets a summary line showing how many servers"
+    echo -e "  responded, the average latency for that city, and a"
+    echo -e "  colored bar. Helps identify regional routing issues."
+    echo ""
+    echo -e "  ${GREEN}3. By ASN${NC}"
+    echo -e "  Same breakdown but grouped by network provider. Shows"
+    echo -e "  which Iranian ISPs/data centers are reachable and their"
+    echo -e "  latency. Useful for identifying ISP-level blocks."
+    echo ""
+    echo -e "  ${GREEN}4. All Servers${NC}"
+    echo -e "  Full per-server results sorted by city, showing exact"
+    echo -e "  latency, packet loss, and ASN for each endpoint."
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${GREEN}Performance${NC}"
+    echo ""
+    echo -e "  All pings run in parallel. Testing ~100 servers with"
+    echo -e "  4 pings each takes about 15-20 seconds total."
+    echo ""
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    read -n 1 -s -r -p "  Press any key to return to menu..." < /dev/tty || true
+}
+
+_info_it_servers() {
+    clear
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  Server List & Coverage${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "  The test list includes ~100 curated Iranian endpoints"
+    echo -e "  covering 7 categories across 29 cities and 45 ASNs:"
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${GREEN}DNS Resolvers${NC}  (Shecan, Electro, TIC)"
+    echo -e "  Public DNS servers hosted inside Iran. If these"
+    echo -e "  respond, basic Iran connectivity is working."
+    echo ""
+    echo -e "  ${GREEN}ISP Gateways${NC}   (Shatel, ParsOnline, Irancell, MCI, ...)"
+    echo -e "  Gateway IPs of major Iranian internet providers."
+    echo -e "  Tests routing to Iran's backbone infrastructure."
+    echo ""
+    echo -e "  ${GREEN}Websites${NC}       (Digikala, Aparat, Snapp, Varzesh3, ...)"
+    echo -e "  Popular Iranian services. Tests real-world endpoint"
+    echo -e "  reachability, not just backbone routing."
+    echo ""
+    echo -e "  ${GREEN}Banks${NC}          (Mellat, Saderat, Pasargad, Saman, ...)"
+    echo -e "  Iranian banking infrastructure. These are critical"
+    echo -e "  services with dedicated network paths."
+    echo ""
+    echo -e "  ${GREEN}Data Centers${NC}   (ParsData, IranServer, HostIran, ...)"
+    echo -e "  Iranian hosting providers. Tests connectivity to"
+    echo -e "  server infrastructure inside Iran."
+    echo ""
+    echo -e "  ${GREEN}Universities${NC}   (Sharif, Amirkabir, IPM)"
+    echo -e "  Academic networks with their own ASNs."
+    echo ""
+    echo -e "  ${GREEN}Regional PoPs${NC}  (TIC/MCI gateways in 29 cities)"
+    echo -e "  TIC (backbone) and MCI (mobile) points of presence"
+    echo -e "  across Iran — from Tehran to Kish Island."
+    echo ""
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    read -n 1 -s -r -p "  Press any key to return to menu..." < /dev/tty || true
+}
+
+_info_it_results() {
+    clear
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  Reading the Results${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${GREEN}Status Indicators${NC}"
+    echo ""
+    echo -e "  Each server gets a colored dot:"
+    echo -e "    ${GREEN}●${NC}  ${GREEN}< 200ms${NC}    — Good connectivity"
+    echo -e "    ${YELLOW}●${NC}  ${YELLOW}200-500ms${NC} — Slow / degraded"
+    echo -e "    ${RED}●${NC}  ${RED}> 500ms${NC}   — Very slow / barely reachable"
+    echo -e "    ${RED}●${NC}  ${RED}---${NC}       — Unreachable (100% packet loss)"
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${GREEN}Result Columns${NC}"
+    echo ""
+    echo -e "  ${BOLD}●  Name           Latency  Loss   ASN${NC}"
+    echo -e "  ${DIM}●  Digikala         142ms    0%   AS43211  Digikala${NC}"
+    echo ""
+    echo -e "  ${BOLD}Latency${NC}  Average round-trip time in milliseconds"
+    echo -e "  ${BOLD}Loss${NC}     Percentage of packets that didn't return"
+    echo -e "  ${BOLD}ASN${NC}      The network operator hosting the endpoint"
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${GREEN}What the numbers mean${NC}"
+    echo ""
+    echo -e "  ${BOLD}Low latency + 0% loss${NC} = great path to that network"
+    echo -e "  ${BOLD}High latency + 0% loss${NC} = reachable but congested"
+    echo -e "  ${BOLD}Low latency + high loss${NC} = unstable connection"
+    echo -e "  ${BOLD}--- + 100% loss${NC} = blocked, down, or ICMP filtered"
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${GREEN}Summary Bars${NC}"
+    echo ""
+    echo -e "  The summary at the bottom shows reachability bars:"
+    echo -e "  ${DIM}  Reachable: 87/99  ${GREEN}█████████████████${NC}${DIM}░░░  87%${NC}"
+    echo ""
+    echo -e "  The bar length = percentage of servers that responded."
+    echo -e "  Color follows the same green/yellow/red thresholds."
+    echo ""
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    read -n 1 -s -r -p "  Press any key to return to menu..." < /dev/tty || true
+}
+
+#═══════════════════════════════════════════════════════════════════════
+# Info pages: Psiphon Network Stats
+#═══════════════════════════════════════════════════════════════════════
+
+_info_psiphon_stats() {
+    local _info_exit=0
+    while [ "$_info_exit" -eq 0 ]; do
+        clear
+        echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+        echo -e "${BOLD}  PSIPHON NETWORK STATS — GUIDE${NC}"
+        echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+        echo ""
+        echo -e "  The Psiphon Network Stats page shows live data from"
+        echo -e "  the Psiphon analytics API. Select a topic below."
+        echo ""
+        echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
+        echo -e "  ${CYAN}a.${NC} ${BOLD}Iran Daily Connections${NC}"
+        echo -e "     ${DIM}Connection count chart for Iran${NC}"
+        echo ""
+        echo -e "  ${CYAN}b.${NC} ${BOLD}Daily Unique Users${NC}"
+        echo -e "     ${DIM}Unique user estimates from Iran${NC}"
+        echo ""
+        echo -e "  ${CYAN}c.${NC} ${BOLD}Global Daily Users${NC}"
+        echo -e "     ${DIM}Total Psiphon users worldwide${NC}"
+        echo ""
+        echo -e "  ${CYAN}d.${NC} ${BOLD}Connections by Region${NC}"
+        echo -e "     ${DIM}Geographic breakdown of connections${NC}"
+        echo ""
+        echo -e "  ${CYAN}e.${NC} ${BOLD}Top Station Regions${NC}"
+        echo -e "     ${DIM}Where Psiphon servers are located${NC}"
+        echo ""
+        echo -e "  ${CYAN}f.${NC} ${BOLD}Data Transferred${NC}"
+        echo -e "     ${DIM}Daily bandwidth through the network${NC}"
+        echo ""
+        echo -e "  ${CYAN}g.${NC} ${BOLD}Data Source & Caching${NC}"
+        echo -e "     ${DIM}API details, refresh intervals${NC}"
+        echo ""
+        echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "  ${CYAN}[0]${NC} Back"
+        echo ""
+        printf "  Select topic: "
+        local _ic=""
+        read -n 1 -s -r _ic < /dev/tty || true
+        echo ""
+        case "$_ic" in
+            a|A) _info_ps_connections ;;
+            b|B) _info_ps_users ;;
+            c|C) _info_ps_global ;;
+            d|D) _info_ps_regions ;;
+            e|E) _info_ps_stations ;;
+            f|F) _info_ps_data ;;
+            g|G) _info_ps_source ;;
+            *) _info_exit=1 ;;
+        esac
+    done
+}
+
+_info_cli_commands() {
+    local _info_exit=0
+    while [ "$_info_exit" -eq 0 ]; do
+        clear
+        echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+        echo -e "${BOLD}  CLI COMMANDS REFERENCE${NC}"
+        echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+        echo ""
+        echo -e "  Run any command with:  ${GREEN}conduit <command>${NC}"
+        echo ""
+        echo -e "  ${CYAN}━━━ Core ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "  ${GREEN}status${NC}            Show container status, connections, traffic"
+        echo -e "  ${GREEN}status --json${NC}     Machine-readable JSON output"
+        echo -e "  ${GREEN}start${NC}             Start all Conduit containers"
+        echo -e "  ${GREEN}stop${NC}              Stop all Conduit containers"
+        echo -e "  ${GREEN}restart${NC}           Restart all Conduit containers"
+        echo -e "  ${GREEN}logs${NC}              View raw Docker container logs"
+        echo -e "  ${GREEN}health${NC}            Run full health check (Docker, network, keys)"
+        echo ""
+        echo -e "  ${CYAN}━━━ Configuration ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "  ${GREEN}settings${NC}          Change max-clients, bandwidth, resources"
+        echo -e "  ${GREEN}scale${NC}             Add or remove containers (1-32)"
+        echo -e "  ${GREEN}update${NC}            Update to latest Conduit image & script"
+        echo -e "  ${GREEN}update-geoip${NC}      Refresh the GeoIP country database"
+        echo ""
+        echo -e "  ${CYAN}━━━ Backup & Identity ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "  ${GREEN}backup${NC}            Backup node identity key to file"
+        echo -e "  ${GREEN}restore${NC}           Restore node identity from backup"
+        echo ""
+        echo -e "  ${CYAN}━━━ Monitoring ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "  ${GREEN}stats${NC}             Live traffic & connection statistics"
+        echo -e "  ${GREEN}peers${NC}             Live peer connections by country"
+        echo -e "  ${GREEN}network-stats${NC}     Psiphon global network statistics"
+        echo -e "  ${GREEN}iran-status${NC}       Iran connectivity (IODA, OONI, RIPE)"
+        echo -e "  ${GREEN}iran-test${NC}         Iran connectivity test (ping, MTU, trace)"
+        echo ""
+        echo -e "  Press ${BOLD}any key${NC} for page 2..."
+        read -n 1 -s -r < /dev/tty || true
+        clear
+        echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+        echo -e "${BOLD}  CLI COMMANDS REFERENCE (continued)${NC}"
+        echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+        echo ""
+        echo -e "  ${CYAN}━━━ Multi-Server ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "  ${GREEN}dashboard${NC}         Multi-server dashboard (live TUI)"
+        echo -e "  ${GREEN}add-server${NC}        Add remote server (auto-deploys Conduit)"
+        echo -e "  ${GREEN}deploy${NC}            Alias for add-server"
+        echo -e "  ${GREEN}edit-server${NC}       Edit server credentials or connection"
+        echo -e "  ${GREEN}remove-server${NC}     Remove a configured remote server"
+        echo -e "  ${GREEN}servers${NC}           List all configured remote servers"
+        echo ""
+        echo -e "  ${CYAN}━━━ Proxies ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "  ${GREEN}snowflake${NC}         Snowflake proxy status"
+        echo -e "  ${GREEN}snowflake start${NC}   Start Snowflake proxy"
+        echo -e "  ${GREEN}snowflake stop${NC}    Stop Snowflake proxy"
+        echo -e "  ${GREEN}snowflake restart${NC} Restart Snowflake proxy"
+        echo -e "  ${GREEN}snowflake remove${NC}  Remove Snowflake completely"
+        echo ""
+        echo -e "  ${GREEN}mtproto${NC}           MTProto proxy status"
+        echo -e "  ${GREEN}mtproto start${NC}     Start MTProto proxy"
+        echo -e "  ${GREEN}mtproto stop${NC}      Stop MTProto proxy"
+        echo -e "  ${GREEN}mtproto restart${NC}   Restart MTProto proxy"
+        echo -e "  ${GREEN}mtproto link${NC}      Show MTProto share link & QR"
+        echo -e "  ${GREEN}mtproto remove${NC}    Remove MTProto completely"
+        echo ""
+        echo -e "  ${CYAN}━━━ Info ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "  ${GREEN}version${NC}           Show version, image digest, container info"
+        echo -e "  ${GREEN}about${NC}             About Psiphon Conduit"
+        echo -e "  ${GREEN}info${NC}              Dashboard metrics explained"
+        echo -e "  ${GREEN}help${NC}              Show quick help summary"
+        echo -e "  ${GREEN}menu${NC}              Open interactive menu (default)"
+        echo -e "  ${GREEN}uninstall${NC}         Remove everything (containers, data, service)"
+        echo ""
+        echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "  ${DIM}Tip: Running 'conduit' with no arguments opens the menu.${NC}"
+        echo -e "  ${DIM}Tip: Most features are also accessible from the menu TUI.${NC}"
+        echo ""
+        read -n 1 -s -r -p "  Press any key to return..." < /dev/tty || true
+        _info_exit=1
+    done
+}
+
+_info_ps_connections() {
+    clear
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  Iran Daily Connections${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "  ${DIM}Source: stats.psianalytics.live · Psiphon Analytics API${NC}"
+    echo ""
+    echo -e "  This chart shows the total number of Psiphon connections"
+    echo -e "  originating from Iran over the last 7 days."
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${GREEN}What is a \"connection\"?${NC}"
+    echo ""
+    echo -e "  Each time a user's Psiphon client establishes a new"
+    echo -e "  tunnel to a Psiphon server, it counts as one connection."
+    echo -e "  A single user may generate multiple connections per day"
+    echo -e "  (e.g., reconnecting after network changes)."
+    echo ""
+    echo -e "  ${GREEN}Why it matters${NC}"
+    echo ""
+    echo -e "  A sudden spike in connections often means increased"
+    echo -e "  censorship pressure — more people are turning to Psiphon."
+    echo -e "  A sudden drop could mean an internet shutdown or that"
+    echo -e "  Iran is blocking Psiphon protocols more aggressively."
+    echo ""
+    echo -e "  Your Conduit directly helps these users by providing"
+    echo -e "  bandwidth for their connections."
+    echo ""
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    read -n 1 -s -r -p "  Press any key to return to menu..." < /dev/tty || true
+}
+
+_info_ps_users() {
+    clear
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  Daily Unique Users from Iran${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "  ${DIM}Source: stats.psianalytics.live · Psiphon Analytics API${NC}"
+    echo ""
+    echo -e "  This chart shows estimated unique Psiphon users in Iran"
+    echo -e "  per day over the last 7 days."
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${GREEN}How users are counted${NC}"
+    echo ""
+    echo -e "  Psiphon uses privacy-preserving techniques to estimate"
+    echo -e "  unique users without tracking individuals. The count is"
+    echo -e "  based on anonymized connection fingerprints — it's an"
+    echo -e "  estimate, not an exact count."
+    echo ""
+    echo -e "  ${GREEN}Connections vs. Users${NC}"
+    echo ""
+    echo -e "  Users < Connections, because one user can create"
+    echo -e "  multiple connections per day. The ratio gives insight:"
+    echo -e "  - High connections/user = unstable network (reconnects)"
+    echo -e "  - Low connections/user = stable connections"
+    echo ""
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    read -n 1 -s -r -p "  Press any key to return to menu..." < /dev/tty || true
+}
+
+_info_ps_global() {
+    clear
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  Global Daily Psiphon Users${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "  ${DIM}Source: stats.psianalytics.live · Psiphon Analytics API${NC}"
+    echo ""
+    echo -e "  This chart shows total daily Psiphon users worldwide"
+    echo -e "  over the last 7 days — all countries combined."
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${GREEN}Why it's useful${NC}"
+    echo ""
+    echo -e "  Comparing Iran's user count against the global total"
+    echo -e "  shows what fraction of Psiphon traffic comes from Iran."
+    echo -e "  Iran is typically one of the top 3 countries by usage."
+    echo ""
+    echo -e "  The global number also shows overall Psiphon network"
+    echo -e "  health — if it drops globally, it may be an infrastructure"
+    echo -e "  issue rather than country-specific censorship."
+    echo ""
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    read -n 1 -s -r -p "  Press any key to return to menu..." < /dev/tty || true
+}
+
+_info_ps_regions() {
+    clear
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  Daily Connections by Region${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "  ${DIM}Source: stats.psianalytics.live · Psiphon Analytics API${NC}"
+    echo ""
+    echo -e "  This chart shows daily connection counts broken down"
+    echo -e "  by the top countries using Psiphon, over the last 7 days."
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${GREEN}How to read it${NC}"
+    echo ""
+    echo -e "  Each country gets its own colored line in the chart."
+    echo -e "  The top 5-6 countries are shown individually; the rest"
+    echo -e "  are grouped as \"Other\"."
+    echo ""
+    echo -e "  Common top countries:"
+    echo -e "  - ${BOLD}Iran${NC} — usually #1 by connections"
+    echo -e "  - ${BOLD}Russia${NC} — significant usage"
+    echo -e "  - ${BOLD}Turkmenistan${NC} — heavy censorship"
+    echo -e "  - ${BOLD}Myanmar${NC} — military censorship"
+    echo -e "  - ${BOLD}China${NC} — Great Firewall bypass"
+    echo ""
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    read -n 1 -s -r -p "  Press any key to return to menu..." < /dev/tty || true
+}
+
+_info_ps_stations() {
+    clear
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  Top Station Regions${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "  ${DIM}Source: stats.psianalytics.live · Psiphon Analytics API${NC}"
+    echo ""
+    echo -e "  This section shows where Psiphon's proxy servers"
+    echo -e "  (\"stations\") are physically located."
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${GREEN}What are stations?${NC}"
+    echo ""
+    echo -e "  Psiphon operates servers in data centers around the"
+    echo -e "  world. When a user in Iran connects, their traffic is"
+    echo -e "  routed through one of these stations. Your Conduit"
+    echo -e "  contributes bandwidth to this network."
+    echo ""
+    echo -e "  ${GREEN}The horizontal bars${NC}"
+    echo ""
+    echo -e "  Each region shows its percentage of total Psiphon"
+    echo -e "  traffic, with a colored bar. Common station locations"
+    echo -e "  include US, Germany, Netherlands, and other countries"
+    echo -e "  with good connectivity and hosting infrastructure."
+    echo ""
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    read -n 1 -s -r -p "  Press any key to return to menu..." < /dev/tty || true
+}
+
+_info_ps_data() {
+    clear
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  Daily Data Transferred${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "  ${DIM}Source: stats.psianalytics.live · Psiphon Analytics API${NC}"
+    echo ""
+    echo -e "  This chart shows total data transferred through the"
+    echo -e "  Psiphon network per day over the last 7 days."
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${GREEN}How to read it${NC}"
+    echo ""
+    echo -e "  Values are shown in human-readable format:"
+    echo -e "    ${BOLD}K${NC} = Kilobytes   ${BOLD}M${NC} = Megabytes"
+    echo -e "    ${BOLD}G${NC} = Gigabytes   ${BOLD}T${NC} = Terabytes"
+    echo ""
+    echo -e "  Typical daily transfer for the entire Psiphon network"
+    echo -e "  is in the petabyte range. Each bar represents one day."
+    echo ""
+    echo -e "  ${GREEN}Your Conduit's contribution${NC}"
+    echo ""
+    echo -e "  Your Conduit container(s) contribute a portion of this"
+    echo -e "  total bandwidth. The more containers you run and the"
+    echo -e "  more bandwidth you allocate, the larger your share."
+    echo ""
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    read -n 1 -s -r -p "  Press any key to return to menu..." < /dev/tty || true
+}
+
+_info_ps_source() {
+    clear
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  Data Source & Caching${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${GREEN}API Source${NC}"
+    echo ""
+    echo -e "  All data comes from the Psiphon Analytics API:"
+    echo -e "  ${DIM}stats.psianalytics.live${NC}"
+    echo ""
+    echo -e "  Three endpoints are fetched in parallel:"
+    echo -e "  - ${BOLD}connected-clients${NC} — connections & unique users"
+    echo -e "  - ${BOLD}psiphon-usage${NC} — global users by country"
+    echo -e "  - ${BOLD}ir-usage${NC} — Iran-specific metrics"
+    echo ""
+    echo -e "  The API is public and requires no authentication."
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${GREEN}Caching${NC}"
+    echo ""
+    echo -e "  Data is cached locally for ${BOLD}6 hours${NC} to avoid excessive"
+    echo -e "  API calls. The \"Updated\" label shows when data was last"
+    echo -e "  fetched. Press ${CYAN}[r]${NC} to force a refresh."
+    echo ""
+    echo -e "  Cache files are stored in the install directory as:"
+    echo -e "  ${DIM}.psi_cache_connected_clients${NC}"
+    echo -e "  ${DIM}.psi_cache_psiphon_usage${NC}"
+    echo -e "  ${DIM}.psi_cache_ir_usage${NC}"
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${GREEN}Chart Display${NC}"
+    echo ""
+    echo -e "  All charts use vertical bar graphs with exact values"
+    echo -e "  shown below. Numbers use K/M/G/T suffixes for"
+    echo -e "  readability (e.g., 13.84M = 13,840,000)."
+    echo ""
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    read -n 1 -s -r -p "  Press any key to return to menu..." < /dev/tty || true
+}
+
+#═══════════════════════════════════════════════════════════════════════
+# Psiphon Network Stats (live data from stats.psianalytics.live)
+#═══════════════════════════════════════════════════════════════════════
+
+# Helpers set variables (_CN, _FN, _MN) — no subshell forks
+_psi_country_name() {
+    case "$1" in
+        IR) _CN="Iran";;         RU) _CN="Russia";;
+        TM) _CN="Turkmenistan";; MM) _CN="Myanmar";;
+        DE) _CN="Germany";;      US) _CN="United States";;
+        GB) _CN="United Kingdom";;FR) _CN="France";;
+        NL) _CN="Netherlands";;  RO) _CN="Romania";;
+        CA) _CN="Canada";;       SY) _CN="Syria";;
+        SE) _CN="Sweden";;       FI) _CN="Finland";;
+        CH) _CN="Switzerland";;  ID) _CN="Indonesia";;
+        UA) _CN="Ukraine";;      SD) _CN="Sudan";;
+        AE) _CN="UAE";;          SG) _CN="Singapore";;
+        EG) _CN="Egypt";;        TR) _CN="Turkey";;
+        IN) _CN="India";;        PK) _CN="Pakistan";;
+        *) _CN="$1";;
+    esac
+}
+
+_psi_fmt_num() {
+    local n="${1:-0}"
+    n="${n%%.*}"; n="${n//[!0-9]/}"; [ -z "$n" ] && n=0
+    if [ "$n" -ge 1000000000 ] 2>/dev/null; then
+        printf -v _FN '%d.%02dB' "$((n / 1000000000))" "$(( (n % 1000000000) / 10000000 ))"
+    elif [ "$n" -ge 1000000 ] 2>/dev/null; then
+        printf -v _FN '%d.%02dM' "$((n / 1000000))" "$(( (n % 1000000) / 10000 ))"
+    elif [ "$n" -ge 1000 ] 2>/dev/null; then
+        printf -v _FN '%d.%01dK' "$((n / 1000))" "$(( (n % 1000) / 100 ))"
+    else
+        printf -v _FN '%d' "$n"
+    fi
+}
+
+_psi_month() {
+    case "$1" in
+        01) _MN="Jan";; 02) _MN="Feb";; 03) _MN="Mar";;
+        04) _MN="Apr";; 05) _MN="May";; 06) _MN="Jun";;
+        07) _MN="Jul";; 08) _MN="Aug";; 09) _MN="Sep";;
+        10) _MN="Oct";; 11) _MN="Nov";; 12) _MN="Dec";;
+        *) _MN="$1";;
+    esac
+}
+
+# Vertical bar chart with min-max scaling and half-block tops
+# Args: $1=color escape, $2=data lines "value label\n...", $3=month name (optional), $4=nolist (suppress values)
+_psi_vchart() {
+    local _vc_clr="$1" _vc_month="${3:-}" _vc_nolist="${4:-}"
+    local -a _vc_v _vc_l
+    local _vc_n=0 _vc_min=2147483647 _vc_max=0 _vv _vl
+
+    while read -r _vv _vl; do
+        [ -z "$_vv" ] && continue
+        _vc_v[_vc_n]="$_vv"
+        _vc_l[_vc_n]="$_vl"
+        [ "$_vv" -lt "$_vc_min" ] 2>/dev/null && _vc_min="$_vv"
+        [ "$_vv" -gt "$_vc_max" ] 2>/dev/null && _vc_max="$_vv"
+        _vc_n=$((_vc_n + 1))
+    done <<< "$2"
+
+    [ "$_vc_n" -eq 0 ] && return 1
+
+    local _vc_rng=$((_vc_max - _vc_min))
+    [ "$_vc_rng" -le 0 ] && _vc_rng=1
+    local _vc_pad=$((_vc_rng / 4))
+    [ "$_vc_pad" -lt 1 ] && _vc_pad=1
+    local _vc_lo=$((_vc_min - _vc_pad))
+    [ "$_vc_lo" -lt 0 ] && _vc_lo=0
+    local _vc_hi=$((_vc_max + _vc_pad))
+    local _vc_span=$((_vc_hi - _vc_lo))
+    [ "$_vc_span" -le 0 ] && _vc_span=1
+    local _vc_h=8 _row _j _tf _th
+
+    for (( _row=_vc_h; _row>=1; _row-- )); do
+        _tf=$(( _vc_lo + (_vc_span * _row / _vc_h) ))
+        _th=$(( _vc_lo + (_vc_span * (2*_row - 1) / (2*_vc_h)) ))
+        # Scale labels on top, middle, bottom rows
+        if [ "$_row" -eq "$_vc_h" ]; then
+            _psi_fmt_num "$_vc_hi"; printf "  %8s ┤" "$_FN"
+        elif [ "$_row" -eq 1 ]; then
+            _psi_fmt_num "$_vc_lo"; printf "  %8s ┤" "$_FN"
+        elif [ "$_row" -eq $(( (_vc_h + 1) / 2 )) ]; then
+            _psi_fmt_num "$(( (_vc_hi + _vc_lo) / 2 ))"; printf "  %8s ┤" "$_FN"
+        else
+            printf "           │"
+        fi
+        for (( _j=0; _j<_vc_n; _j++ )); do
+            if [ "${_vc_v[_j]}" -ge "$_tf" ] 2>/dev/null; then
+                printf " ${_vc_clr}███${NC}  "
+            elif [ "${_vc_v[_j]}" -ge "$_th" ] 2>/dev/null; then
+                printf " ${_vc_clr}▄▄▄${NC}  "
+            else
+                printf "      "
+            fi
+        done
+        printf "\n"
+    done
+    # X-axis
+    printf "           └"
+    for (( _j=0; _j<_vc_n; _j++ )); do printf "──────"; done
+    printf "\n"
+    # Date labels with month prefix
+    if [ -n "$_vc_month" ]; then
+        printf "      ${DIM}%-5s${NC} " "$_vc_month"
+    else
+        printf "            "
+    fi
+    for (( _j=0; _j<_vc_n; _j++ )); do printf "  %-3s " "${_vc_l[_j]}"; done
+    printf "\n"
+    # Exact values — vertical list with month prefix (skip if $4=nolist)
+    if [ "$_vc_nolist" != "nolist" ]; then
+        local _vc_mn="${_vc_month:-""}"
+        for (( _j=0; _j<_vc_n; _j++ )); do
+            _psi_fmt_num "${_vc_v[_j]}"
+            printf "  ${DIM}  %s %s : %s${NC}\n" "$_vc_mn" "${_vc_l[_j]}" "$_FN"
+        done
+    fi
+}
+
+#═══════════════════════════════════════════════════════════════════════
+# Iran Connectivity Status Page
+#═══════════════════════════════════════════════════════════════════════
+
+show_iran_connectivity() {
+    local _ic_exit=0 _force_refresh=true
+    local _BARS="████████████████████"
+    local _EMPTY="░░░░░░░░░░░░░░░░░░░░"
+    local _cache_max=300  # 5 minutes in seconds
+
+    while [ "$_ic_exit" -eq 0 ]; do
+        clear
+        echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+        echo -e "${BOLD}  IRAN CONNECTIVITY STATUS${NC}"
+        echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+        echo ""
+
+        local _ic_need_fetch=true _ic_cache_age=0
+        local _ic_today _ic_today_local
+        _ic_today=$(date -u +%Y-%m-%d)
+        _ic_today_local=$(date +%Y-%m-%d)
+
+        # --- Cache check (5 minutes) ---
+        if ! $_force_refresh && [ -f "$INSTALL_DIR/.iran_cache_ioda_bgp" ]; then
+            local _ic_now _ic_ts
+            _ic_now=$(date +%s)
+            _ic_ts=$(stat -c %Y "$INSTALL_DIR/.iran_cache_ioda_bgp" 2>/dev/null || echo 0)
+            _ic_cache_age=$(( _ic_now - _ic_ts ))
+            if [ "$_ic_cache_age" -lt "$_cache_max" ] 2>/dev/null; then
+                _ic_need_fetch=false
+            fi
+        fi
+
+        if $_ic_need_fetch; then
+            _force_refresh=false
+            echo -e "  ${DIM}Fetching data from IODA, OONI...${NC}"
+
+            local _tmpdir
+            _tmpdir=$(mktemp -d)
+
+            local _ic_now _ic_7d_ago _ic_today _ic_today_local _ic_7d_date
+            _ic_now=$(date +%s)
+            _ic_7d_ago=$(( _ic_now - 7 * 86400 ))
+            _ic_today=$(date -u +%Y-%m-%d)
+            _ic_today_local=$(date +%Y-%m-%d)
+            _ic_7d_date=$(date -u -d "@$_ic_7d_ago" +%Y-%m-%d 2>/dev/null || date -u -d "7 days ago" +%Y-%m-%d 2>/dev/null)
+
+            # Parallel fetches
+            curl -s --max-time 20 "https://api.ioda.inetintel.cc.gatech.edu/v2/signals/raw/country/IR?from=$_ic_7d_ago&until=$_ic_now&datasource=bgp&maxPoints=7" > "$_tmpdir/ioda_bgp" 2>/dev/null &
+            curl -s --max-time 20 "https://api.ioda.inetintel.cc.gatech.edu/v2/signals/raw/country/IR?from=$_ic_7d_ago&until=$_ic_now&datasource=ping-slash24&maxPoints=7" > "$_tmpdir/ioda_ping" 2>/dev/null &
+            curl -s --max-time 20 "https://api.ioda.inetintel.cc.gatech.edu/v2/outages/alerts?entityType=country&entityCode=IR&from=$_ic_7d_ago&until=$_ic_now&limit=10" > "$_tmpdir/ioda_alerts" 2>/dev/null &
+            curl -s --max-time 15 "https://api.ooni.io/api/v1/aggregation?probe_cc=IR&test_name=web_connectivity&since=$_ic_7d_date&until=$_ic_today&axis_x=measurement_start_day" > "$_tmpdir/ooni_anomaly" 2>/dev/null &
+            curl -s --max-time 20 "https://api.ioda.inetintel.cc.gatech.edu/v2/signals/raw/country/IR?from=$_ic_7d_ago&until=$_ic_now&datasource=merit-nt&maxPoints=7" > "$_tmpdir/ioda_merit" 2>/dev/null &
+            curl -s --max-time 20 "https://api.ioda.inetintel.cc.gatech.edu/v2/signals/raw/country/IR?from=$_ic_7d_ago&until=$_ic_now&datasource=gtr&maxPoints=7" > "$_tmpdir/ioda_gtr" 2>/dev/null &
+            # IODA latency & packet loss
+            curl -s --max-time 20 "https://api.ioda.inetintel.cc.gatech.edu/v2/signals/raw/country/IR?from=$_ic_7d_ago&until=$_ic_now&datasource=ping-slash24-latency&maxPoints=1" > "$_tmpdir/ioda_latency" 2>/dev/null &
+            curl -s --max-time 20 "https://api.ioda.inetintel.cc.gatech.edu/v2/signals/raw/country/IR?from=$_ic_7d_ago&until=$_ic_now&datasource=ping-slash24-loss&maxPoints=1" > "$_tmpdir/ioda_loss" 2>/dev/null &
+            # irinter.net network score (7 days)
+            curl -s --max-time 15 "https://irinter.net/api/data/network-score?from=$_ic_7d_ago&until=$_ic_now" > "$_tmpdir/irinter" 2>/dev/null &
+            # RIPE Atlas probe counts
+            curl -s --max-time 10 "https://atlas.ripe.net/api/v2/probes/?country_code=IR&status=1&page_size=1" > "$_tmpdir/ripe_up" 2>/dev/null &
+            curl -s --max-time 10 "https://atlas.ripe.net/api/v2/probes/?country_code=IR&status=2&page_size=1" > "$_tmpdir/ripe_down" 2>/dev/null &
+            # OONI messaging apps
+            curl -s --max-time 15 "https://api.ooni.io/api/v1/aggregation?probe_cc=IR&test_name=telegram&since=$_ic_7d_date&until=$_ic_today" > "$_tmpdir/ooni_telegram" 2>/dev/null &
+            curl -s --max-time 15 "https://api.ooni.io/api/v1/aggregation?probe_cc=IR&test_name=whatsapp&since=$_ic_7d_date&until=$_ic_today" > "$_tmpdir/ooni_whatsapp" 2>/dev/null &
+            curl -s --max-time 15 "https://api.ooni.io/api/v1/aggregation?probe_cc=IR&test_name=signal&since=$_ic_7d_date&until=$_ic_today" > "$_tmpdir/ooni_signal" 2>/dev/null &
+            curl -s --max-time 15 "https://api.ooni.io/api/v1/aggregation?probe_cc=IR&test_name=facebook_messenger&since=$_ic_7d_date&until=$_ic_today" > "$_tmpdir/ooni_facebook" 2>/dev/null &
+            wait
+
+            # Validate & cache
+            local _f
+            for _f in ioda_bgp ioda_ping ioda_alerts ooni_anomaly ioda_merit ioda_gtr ioda_latency ioda_loss irinter ripe_up ripe_down ooni_telegram ooni_whatsapp ooni_signal ooni_facebook; do
+                if [ -s "$_tmpdir/$_f" ]; then
+                    cp "$_tmpdir/$_f" "$INSTALL_DIR/.iran_cache_$_f"
+                fi
+            done
+            _ic_cache_age=0
+            rm -rf "$_tmpdir"
+        fi
+
+        # --- Format cache age with timestamp ---
+        local _ic_update_ts=$(( _ic_now - _ic_cache_age ))
+        local _ic_update_time
+        _ic_update_time=$(date -d "@$_ic_update_ts" '+%b %d, %H:%M' 2>/dev/null) || _ic_update_time=$(date -r "$_ic_update_ts" '+%b %d, %H:%M' 2>/dev/null) || _ic_update_time=""
+        local _ic_age_label="just now"
+        if [ "$_ic_cache_age" -gt 0 ] 2>/dev/null; then
+            if [ "$_ic_cache_age" -lt 60 ]; then
+                _ic_age_label="${_ic_cache_age}s ago"
+            elif [ "$_ic_cache_age" -lt 3600 ]; then
+                _ic_age_label="$((_ic_cache_age / 60))m ago"
+            else
+                _ic_age_label="$((_ic_cache_age / 3600))h ago"
+            fi
+        fi
+        if [ -n "$_ic_update_time" ]; then
+            echo -e "  ${DIM}Updated: ${_ic_update_time} (${_ic_age_label})${NC}"
+        else
+            echo -e "  ${DIM}Updated: ${_ic_age_label}${NC}"
+        fi
+        echo ""
+
+        # --- Load cached data (no subprocesses) ---
+        local _ioda_bgp_raw="" _ioda_ping_raw="" _ioda_alerts_raw=""
+        local _ooni_anom_raw=""
+        [ -f "$INSTALL_DIR/.iran_cache_ioda_bgp" ] && _ioda_bgp_raw=$(<"$INSTALL_DIR/.iran_cache_ioda_bgp")
+        [ -f "$INSTALL_DIR/.iran_cache_ioda_ping" ] && _ioda_ping_raw=$(<"$INSTALL_DIR/.iran_cache_ioda_ping")
+        [ -f "$INSTALL_DIR/.iran_cache_ioda_alerts" ] && _ioda_alerts_raw=$(<"$INSTALL_DIR/.iran_cache_ioda_alerts")
+        [ -f "$INSTALL_DIR/.iran_cache_ooni_anomaly" ] && _ooni_anom_raw=$(<"$INSTALL_DIR/.iran_cache_ooni_anomaly")
+        local _ioda_merit_raw="" _ioda_gtr_raw=""
+        [ -f "$INSTALL_DIR/.iran_cache_ioda_merit" ] && _ioda_merit_raw=$(<"$INSTALL_DIR/.iran_cache_ioda_merit")
+        [ -f "$INSTALL_DIR/.iran_cache_ioda_gtr" ] && _ioda_gtr_raw=$(<"$INSTALL_DIR/.iran_cache_ioda_gtr")
+        local _ioda_latency_raw="" _ioda_loss_raw=""
+        [ -f "$INSTALL_DIR/.iran_cache_ioda_latency" ] && _ioda_latency_raw=$(<"$INSTALL_DIR/.iran_cache_ioda_latency")
+        [ -f "$INSTALL_DIR/.iran_cache_ioda_loss" ] && _ioda_loss_raw=$(<"$INSTALL_DIR/.iran_cache_ioda_loss")
+        local _irinter_raw=""
+        [ -f "$INSTALL_DIR/.iran_cache_irinter" ] && _irinter_raw=$(<"$INSTALL_DIR/.iran_cache_irinter")
+        local _ripe_up_raw="" _ripe_down_raw=""
+        [ -f "$INSTALL_DIR/.iran_cache_ripe_up" ] && _ripe_up_raw=$(<"$INSTALL_DIR/.iran_cache_ripe_up")
+        [ -f "$INSTALL_DIR/.iran_cache_ripe_down" ] && _ripe_down_raw=$(<"$INSTALL_DIR/.iran_cache_ripe_down")
+        local _ooni_tg_raw="" _ooni_wa_raw="" _ooni_sig_raw="" _ooni_fb_raw=""
+        [ -f "$INSTALL_DIR/.iran_cache_ooni_telegram" ] && _ooni_tg_raw=$(<"$INSTALL_DIR/.iran_cache_ooni_telegram")
+        [ -f "$INSTALL_DIR/.iran_cache_ooni_whatsapp" ] && _ooni_wa_raw=$(<"$INSTALL_DIR/.iran_cache_ooni_whatsapp")
+        [ -f "$INSTALL_DIR/.iran_cache_ooni_signal" ] && _ooni_sig_raw=$(<"$INSTALL_DIR/.iran_cache_ooni_signal")
+        [ -f "$INSTALL_DIR/.iran_cache_ooni_facebook" ] && _ooni_fb_raw=$(<"$INSTALL_DIR/.iran_cache_ooni_facebook")
+        # =============================================================
+        # PARSE IODA BGP DATA
+        # =============================================================
+        local _bgp_values="" _bgp_from=0 _bgp_step=86400
+        if [ -n "$_ioda_bgp_raw" ]; then
+            # Pure bash extraction (avoids 6 subprocess forks)
+            local _tmp
+            _tmp="${_ioda_bgp_raw#*\"from\":}"; _bgp_from="${_tmp%%[,\}]*}"; _bgp_from="${_bgp_from//[!0-9]/}"
+            _tmp="${_ioda_bgp_raw#*\"step\":}"; _bgp_step="${_tmp%%[,\}]*}"; _bgp_step="${_bgp_step//[!0-9]/}"
+            [ -z "$_bgp_from" ] && _bgp_from=0
+            [ -z "$_bgp_step" ] && _bgp_step=86400
+            # Extract values array content between "values":[ and ]
+            _tmp="${_ioda_bgp_raw#*\"values\":\[}"; _bgp_values="${_tmp%%\]*}"
+        fi
+
+        # Build BGP chart data: "normalized_value day_label\n"
+        # Skip the last (current/incomplete) time bucket
+        local _bgp_chart="" _bgp_max=0 _bgp_latest=0 _bgp_latest_pct=0
+        local _ic_now_epoch
+        _ic_now_epoch=$(date +%s 2>/dev/null || echo 0)
+        if [ -n "$_bgp_values" ]; then
+            local _bgp_arr _bv _bi=0 _bts _bday _bmon="" _bgp_int
+            IFS=',' read -ra _bgp_arr <<< "$_bgp_values"
+            # Find max (skip incomplete current bucket)
+            for _bv in "${_bgp_arr[@]}"; do
+                _bts=$(( _bgp_from + (_bi * _bgp_step) ))
+                _bi=$((_bi + 1))
+                [ "$_bts" -ge "$_ic_now_epoch" ] 2>/dev/null && continue
+                _bgp_int="${_bv%%.*}"
+                _bgp_int="${_bgp_int//[!0-9]/}"
+                [ -z "$_bgp_int" ] && _bgp_int=0
+                [ "$_bgp_int" -gt "$_bgp_max" ] 2>/dev/null && _bgp_max="$_bgp_int"
+            done
+            [ "$_bgp_max" -eq 0 ] && _bgp_max=1
+            # Build chart data normalized to 0-100 (skip incomplete current bucket)
+            _bi=0
+            for _bv in "${_bgp_arr[@]}"; do
+                _bts=$(( _bgp_from + (_bi * _bgp_step) ))
+                _bi=$((_bi + 1))
+                [ "$_bts" -ge "$_ic_now_epoch" ] 2>/dev/null && continue
+                _bgp_int="${_bv%%.*}"
+                _bgp_int="${_bgp_int//[!0-9]/}"
+                [ -z "$_bgp_int" ] && _bgp_int=0
+                local _bpct=$(( (_bgp_int * 100) / _bgp_max ))
+                _bday=$(date -u -d "@$_bts" +"%m %d" 2>/dev/null)
+                if [ -n "$_bday" ]; then
+                    [ -z "$_bmon" ] && { _psi_month "${_bday%% *}"; _bmon="$_MN"; }
+                    _bgp_chart+="${_bpct} ${_bday##* }"$'\n'
+                fi
+                _bgp_latest="$_bgp_int"
+                _bgp_latest_pct="$_bpct"
+            done
+        fi
+
+        # =============================================================
+        # PARSE IODA PING DATA
+        # =============================================================
+        local _ping_values="" _ping_from=0 _ping_step=86400
+        if [ -n "$_ioda_ping_raw" ]; then
+            local _tmp
+            _tmp="${_ioda_ping_raw#*\"from\":}"; _ping_from="${_tmp%%[,\}]*}"; _ping_from="${_ping_from//[!0-9]/}"
+            _tmp="${_ioda_ping_raw#*\"step\":}"; _ping_step="${_tmp%%[,\}]*}"; _ping_step="${_ping_step//[!0-9]/}"
+            [ -z "$_ping_from" ] && _ping_from=0
+            [ -z "$_ping_step" ] && _ping_step=86400
+            _tmp="${_ioda_ping_raw#*\"values\":\[}"; _ping_values="${_tmp%%\]*}"
+        fi
+
+        local _ping_chart="" _ping_max=0
+        if [ -n "$_ping_values" ]; then
+            local _ping_arr _pv _pi=0 _pts _pday _pmon="" _ping_int
+            IFS=',' read -ra _ping_arr <<< "$_ping_values"
+            # Find max (skip incomplete current bucket)
+            for _pv in "${_ping_arr[@]}"; do
+                _pts=$(( _ping_from + (_pi * _ping_step) ))
+                _pi=$((_pi + 1))
+                [ "$_pts" -ge "$_ic_now_epoch" ] 2>/dev/null && continue
+                _ping_int="${_pv%%.*}"
+                _ping_int="${_ping_int//[!0-9]/}"
+                [ -z "$_ping_int" ] && _ping_int=0
+                [ "$_ping_int" -gt "$_ping_max" ] 2>/dev/null && _ping_max="$_ping_int"
+            done
+            [ "$_ping_max" -eq 0 ] && _ping_max=1
+            _pi=0
+            for _pv in "${_ping_arr[@]}"; do
+                _pts=$(( _ping_from + (_pi * _ping_step) ))
+                _pi=$((_pi + 1))
+                [ "$_pts" -ge "$_ic_now_epoch" ] 2>/dev/null && continue
+                _ping_int="${_pv%%.*}"
+                _ping_int="${_ping_int//[!0-9]/}"
+                [ -z "$_ping_int" ] && _ping_int=0
+                local _ppct=$(( (_ping_int * 100) / _ping_max ))
+                _pday=$(date -u -d "@$_pts" +"%m %d" 2>/dev/null)
+                if [ -n "$_pday" ]; then
+                    [ -z "$_pmon" ] && { _psi_month "${_pday%% *}"; _pmon="$_MN"; }
+                    _ping_chart+="${_ppct} ${_pday##* }"$'\n'
+                fi
+            done
+        fi
+
+        # =============================================================
+        # PARSE IRINTER.NET NETWORK SCORE DATA
+        # =============================================================
+        local _ir_latest="" _ir_latest_int=0 _ir_trend="Stable" _ir_chart="" _ir_mon=""
+        if [ -n "$_irinter_raw" ] && [ "${#_irinter_raw}" -gt 5 ]; then
+            local _tmp
+            # Latest value (last "value": in data — most recent)
+            _tmp="${_irinter_raw##*\"value\":}"; _ir_latest="${_tmp%%[,\}\]]*}"
+            _ir_latest="${_ir_latest//[!0-9.]/}"
+            _ir_latest_int="${_ir_latest%%.*}"; _ir_latest_int="${_ir_latest_int:-0}"
+
+            # First value (first "value": in data — oldest)
+            local _ir_first=""
+            _tmp="${_irinter_raw#*\"value\":}"; _ir_first="${_tmp%%[,\}\]]*}"
+            _ir_first="${_ir_first//[!0-9.]/}"
+            local _ir_first_int="${_ir_first%%.*}"; _ir_first_int="${_ir_first_int:-0}"
+
+            # Trend: compare first vs latest
+            local _ir_diff=$(( _ir_latest_int - _ir_first_int ))
+            if [ "$_ir_diff" -gt 2 ] 2>/dev/null; then
+                _ir_trend="Increasing"
+            elif [ "$_ir_diff" -lt -2 ] 2>/dev/null; then
+                _ir_trend="Decreasing"
+            fi
+
+            # Build daily chart: aggregate 5-min data points into daily averages
+            local _ir_data_block
+            _tmp="${_irinter_raw#*\"data\":\[}"; _ir_data_block="${_tmp%%\]*}"
+
+            # Group by day bucket (epoch / 86400) — avoids date subprocess per entry
+            local -A _ir_day_sum _ir_day_cnt _ir_day_ts
+            local _ir_entries _ir_entry _ir_efrom _ir_eval _ir_eval_int _ir_day_key
+            _ir_entries="${_ir_data_block//\},\{/$'\n'}"
+            while IFS= read -r _ir_entry; do
+                [ -z "$_ir_entry" ] && continue
+                _tmp="${_ir_entry#*\"from\":}"; _ir_efrom="${_tmp%%[,\}]*}"
+                _ir_efrom="${_ir_efrom//[!0-9]/}"
+                [ -z "$_ir_efrom" ] && continue
+                _tmp="${_ir_entry#*\"value\":}"; _ir_eval="${_tmp%%[,\}\]]*}"
+                _ir_eval="${_ir_eval//[!0-9.]/}"
+                [ -z "$_ir_eval" ] && continue
+                _ir_eval_int="${_ir_eval%%.*}"; _ir_eval_int="${_ir_eval_int:-0}"
+                _ir_day_key=$(( _ir_efrom / 86400 ))
+                _ir_day_sum[$_ir_day_key]=$(( ${_ir_day_sum[$_ir_day_key]:-0} + _ir_eval_int ))
+                _ir_day_cnt[$_ir_day_key]=$(( ${_ir_day_cnt[$_ir_day_key]:-0} + 1 ))
+                [ -z "${_ir_day_ts[$_ir_day_key]+x}" ] && _ir_day_ts[$_ir_day_key]="$_ir_efrom"
+            done <<< "$_ir_entries"
+
+            # Build chart sorted by day (skip today — incomplete data)
+            local _today_key=$(( _ic_now_epoch / 86400 ))
+            local _ir_dk _ir_davg _ir_dts _ir_dday
+            for _ir_dk in $(echo "${!_ir_day_sum[@]}" | tr ' ' '\n' | sort -n); do
+                [ "$_ir_dk" -eq "$_today_key" ] 2>/dev/null && continue
+                if [ "${_ir_day_cnt[$_ir_dk]:-0}" -gt 0 ] 2>/dev/null; then
+                    _ir_davg=$(( ${_ir_day_sum[$_ir_dk]} / ${_ir_day_cnt[$_ir_dk]} ))
+                else
+                    _ir_davg=0
+                fi
+                _ir_dts="${_ir_day_ts[$_ir_dk]}"
+                _ir_dday=$(date -u -d "@$_ir_dts" +"%m %d" 2>/dev/null)
+                if [ -n "$_ir_dday" ]; then
+                    [ -z "$_ir_mon" ] && { _psi_month "${_ir_dday%% *}"; _ir_mon="$_MN"; }
+                    _ir_chart+="${_ir_davg} ${_ir_dday##* }"$'\n'
+                fi
+            done
+        fi
+
+        # =============================================================
+        # STATUS INDICATOR (two lines: irinter.net + BGP)
+        # =============================================================
+        local _showed_status=false
+        if [ -n "$_ir_latest" ] && [ "$_ir_latest_int" -gt 0 ] 2>/dev/null; then
+            local _ir_sclr="${GREEN}" _ir_slabel="ONLINE"
+            local _ir_tclr="${DIM}" _ir_tarrow=""
+            if [ "$_ir_latest_int" -lt 50 ] 2>/dev/null; then
+                _ir_sclr="${RED}"; _ir_slabel="OFFLINE"
+            elif [ "$_ir_latest_int" -lt 80 ] 2>/dev/null; then
+                _ir_sclr="${YELLOW}"; _ir_slabel="WARNING"
+            fi
+            case "$_ir_trend" in
+                Increasing) _ir_tarrow="^"; _ir_tclr="${GREEN}" ;;
+                Decreasing) _ir_tarrow="v"; _ir_tclr="${RED}" ;;
+                *) _ir_tarrow="-"; _ir_tclr="${DIM}" ;;
+            esac
+            echo -e "  ${_ir_sclr}●${NC} ${_ir_sclr}${BOLD}${_ir_slabel}${NC} ${DIM}—${NC} ${_ir_sclr}${_ir_latest_int}%${NC} ${DIM}connectivity${NC}  ${_ir_tclr}${_ir_tarrow} ${_ir_trend}${NC}  ${DIM}(irinter.net)${NC}"
+            _showed_status=true
+        fi
+        if [ -n "$_bgp_chart" ]; then
+            local _bgp_sclr="${GREEN}"
+            [ "$_bgp_latest_pct" -lt 80 ] 2>/dev/null && _bgp_sclr="${YELLOW}"
+            [ "$_bgp_latest_pct" -lt 40 ] 2>/dev/null && _bgp_sclr="${RED}"
+            echo -e "  ${_bgp_sclr}●${NC} ${_bgp_sclr}${_bgp_latest_pct}%${NC} ${DIM}BGP reachability${NC}  ${DIM}(IODA)${NC}"
+            _showed_status=true
+        fi
+        $_showed_status && echo ""
+
+        # =============================================================
+        # 1. IRAN INTERNET EXCHANGE SCORE (irinter.net - 7-day chart)
+        # =============================================================
+        if [ -n "$_ir_chart" ]; then
+            echo -e "  ${CYAN}── Iran Internet Exchange Score (irinter.net - last 7 days) ──${NC}"
+            echo ""
+            _psi_vchart "${GREEN}" "$_ir_chart" "$_ir_mon" "nolist"
+            echo ""
+        fi
+
+        # =============================================================
+        # 2. INTERNET REACHABILITY (IODA BGP - vertical bar chart)
+        # =============================================================
+        if [ -n "$_bgp_chart" ]; then
+            echo -e "  ${CYAN}── Internet Reachability (IODA BGP - last 7 days) ────────────${NC}"
+            echo ""
+            _psi_vchart "${GREEN}" "$_bgp_chart" "$_bmon" "nolist"
+            echo ""
+        fi
+
+        # =============================================================
+        # 2. ACTIVE PROBING (IODA ping - vertical bar chart)
+        # =============================================================
+        if [ -n "$_ping_chart" ]; then
+            echo -e "  ${CYAN}── Active Probing (IODA - last 7 days) ────────────────────────${NC}"
+            echo ""
+            _psi_vchart "${CYAN}" "$_ping_chart" "$_pmon" "nolist"
+            echo ""
+        fi
+
+        # =============================================================
+        # 3. RECENT OUTAGE ALERTS
+        # =============================================================
+        echo -e "  ${CYAN}── Recent Outage Alerts (IODA) ────────────────────────────────${NC}"
+        echo ""
+        local _has_alerts=false
+        if [ -n "$_ioda_alerts_raw" ]; then
+            # Extract data array content using bash string ops
+            local _alert_data _tmp
+            _tmp="${_ioda_alerts_raw#*\"data\":\[}"; _alert_data="${_tmp%%\],\"copyright\"*}"
+            if [ -n "$_alert_data" ] && [ "${#_alert_data}" -gt 2 ]; then
+                printf "  ${DIM}%-14s %-10s %-10s %-8s${NC}\n" "Date" "Source" "Level" "Condition"
+                local _alert_entries
+                _alert_entries="${_alert_data//\},\{/$'\n'}"
+                while IFS= read -r _ae; do
+                    [ -z "$_ae" ] && continue
+                    local _a_from _a_ds _a_level _a_cond _a_date
+                    # Pure bash field extraction
+                    _tmp="${_ae#*\"from\":}"; _a_from="${_tmp%%[,\}]*}"; _a_from="${_a_from//[!0-9]/}"
+                    _tmp="${_ae#*\"datasource\":\"}"; _a_ds="${_tmp%%\"*}"
+                    _tmp="${_ae#*\"level\":\"}"; _a_level="${_tmp%%\"*}"
+                    _tmp="${_ae#*\"condition\":\"}"; _a_cond="${_tmp%%\"*}"
+                    [ -z "$_a_from" ] && continue
+                    _a_date=$(date -u -d "@$_a_from" +"%b %d %H:%M" 2>/dev/null || echo "unknown")
+                    local _a_clr="${YELLOW}"
+                    [ "$_a_level" = "critical" ] && _a_clr="${RED}"
+                    printf "  %-14s %-10s ${_a_clr}%-10s${NC} %-8s\n" "$_a_date" "${_a_ds:-?}" "${_a_level:-?}" "${_a_cond:-?}"
+                    _has_alerts=true
+                done <<< "$_alert_entries"
+            fi
+        fi
+        if ! $_has_alerts; then
+            echo -e "  ${GREEN}No outages detected in last 7 days${NC}"
+        fi
+        echo ""
+
+        # =============================================================
+        # 4. NETWORK ANOMALY TREND (OONI - vertical bar chart)
+        # =============================================================
+        if [ -n "$_ooni_anom_raw" ]; then
+            echo -e "  ${CYAN}── Network Anomaly Trend (OONI - last 7 days) ────────────────${NC}"
+            echo -e "  ${DIM}Higher = more censorship/disruption detected${NC}"
+            echo ""
+
+            # Aggregate hourly data into daily: sum anomaly_count and measurement_count per date
+            # Uses pure bash string ops to avoid subprocess forks (~168 entries × 3 sed = 500+ forks saved)
+            local _anom_entries _anom_line _anom_date _anom_cnt _anom_tot _anom_tmp
+            local -A _anom_day_a _anom_day_t
+            _anom_entries="${_ooni_anom_raw//\},\{/$'\n'}"
+            while IFS= read -r _anom_line; do
+                [ -z "$_anom_line" ] && continue
+                # Extract date: find "measurement_start_day":" then grab YYYY-MM-DD before T
+                _anom_tmp="${_anom_line#*\"measurement_start_day\":\"}"
+                [ "$_anom_tmp" = "$_anom_line" ] && continue
+                _anom_date="${_anom_tmp%%T*}"
+                [[ "$_anom_date" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || continue
+                # Extract anomaly_count: grab digits after "anomaly_count":
+                _anom_tmp="${_anom_line#*\"anomaly_count\":}"
+                _anom_cnt="${_anom_tmp%%[,\}]*}"
+                _anom_cnt="${_anom_cnt//[!0-9]/}"
+                # Extract measurement_count: grab digits after "measurement_count":
+                _anom_tmp="${_anom_line#*\"measurement_count\":}"
+                _anom_tot="${_anom_tmp%%[,\}]*}"
+                _anom_tot="${_anom_tot//[!0-9]/}"
+                _anom_cnt="${_anom_cnt:-0}"; _anom_tot="${_anom_tot:-0}"
+                _anom_day_a[$_anom_date]=$(( ${_anom_day_a[$_anom_date]:-0} + _anom_cnt ))
+                _anom_day_t[$_anom_date]=$(( ${_anom_day_t[$_anom_date]:-0} + _anom_tot ))
+            done <<< "$_anom_entries"
+
+            # Build chart data sorted by date (skip incomplete today)
+            local _anom_chart="" _anom_mon="" _ad _apct
+            for _ad in $(echo "${!_anom_day_a[@]}" | tr ' ' '\n' | sort); do
+                [ "$_ad" = "$_ic_today" ] && continue
+                [ "$_ad" = "$_ic_today_local" ] && continue
+                if [ "${_anom_day_t[$_ad]:-0}" -gt 0 ] 2>/dev/null; then
+                    _apct=$(( (${_anom_day_a[$_ad]} * 100) / ${_anom_day_t[$_ad]} ))
+                else
+                    _apct=0
+                fi
+                [ -z "$_anom_mon" ] && { _psi_month "${_ad:5:2}"; _anom_mon="$_MN"; }
+                _anom_chart+="${_apct} ${_ad:8:2}"$'\n'
+            done
+
+            if [ -n "$_anom_chart" ]; then
+                _psi_vchart "${YELLOW}" "$_anom_chart" "$_anom_mon"
+            fi
+            echo ""
+        fi
+
+        # =============================================================
+        # 6. DARKNET TRAFFIC (IODA Merit Network Telescope)
+        # =============================================================
+        local _merit_values="" _merit_from=0 _merit_step=86400
+        if [ -n "$_ioda_merit_raw" ]; then
+            local _tmp
+            _tmp="${_ioda_merit_raw#*\"from\":}"; _merit_from="${_tmp%%[,\}]*}"; _merit_from="${_merit_from//[!0-9]/}"
+            _tmp="${_ioda_merit_raw#*\"step\":}"; _merit_step="${_tmp%%[,\}]*}"; _merit_step="${_merit_step//[!0-9]/}"
+            [ -z "$_merit_from" ] && _merit_from=0
+            [ -z "$_merit_step" ] && _merit_step=86400
+            _tmp="${_ioda_merit_raw#*\"values\":\[}"; _merit_values="${_tmp%%\]*}"
+        fi
+        if [ -n "$_merit_values" ]; then
+            echo -e "  ${CYAN}── Darknet Traffic (IODA Merit-NT - last 7 days) ────────────${NC}"
+            echo -e "  ${DIM}Unsolicited traffic volume — drops indicate outages${NC}"
+            echo ""
+            local _merit_arr _mv _mi=0 _mts _mday _mmon="" _merit_int _merit_max=0 _merit_chart=""
+            IFS=',' read -ra _merit_arr <<< "$_merit_values"
+            for _mv in "${_merit_arr[@]}"; do
+                _mts=$(( _merit_from + (_mi * _merit_step) ))
+                _mi=$((_mi + 1))
+                [ "$_mts" -ge "$_ic_now_epoch" ] 2>/dev/null && continue
+                _merit_int="${_mv%%.*}"; _merit_int="${_merit_int//[!0-9]/}"
+                [ -z "$_merit_int" ] && _merit_int=0
+                [ "$_merit_int" -gt "$_merit_max" ] 2>/dev/null && _merit_max="$_merit_int"
+            done
+            [ "$_merit_max" -eq 0 ] && _merit_max=1
+            _mi=0
+            for _mv in "${_merit_arr[@]}"; do
+                _mts=$(( _merit_from + (_mi * _merit_step) ))
+                _mi=$((_mi + 1))
+                [ "$_mts" -ge "$_ic_now_epoch" ] 2>/dev/null && continue
+                _merit_int="${_mv%%.*}"; _merit_int="${_merit_int//[!0-9]/}"
+                [ -z "$_merit_int" ] && _merit_int=0
+                _mday=$(date -u -d "@$_mts" +"%m %d" 2>/dev/null)
+                if [ -n "$_mday" ]; then
+                    [ -z "$_mmon" ] && { _psi_month "${_mday%% *}"; _mmon="$_MN"; }
+                    _merit_chart+="${_merit_int} ${_mday##* }"$'\n'
+                fi
+            done
+            [ -n "$_merit_chart" ] && _psi_vchart "${MAGENTA}" "$_merit_chart" "$_mmon" "nolist"
+            echo ""
+        fi
+
+        # =============================================================
+        # 7. GOOGLE SEARCH TRAFFIC (IODA Google Transparency Report)
+        # =============================================================
+        local _gtr_values="" _gtr_from=0 _gtr_step=86400
+        if [ -n "$_ioda_gtr_raw" ]; then
+            local _tmp
+            _tmp="${_ioda_gtr_raw#*\"from\":}"; _gtr_from="${_tmp%%[,\}]*}"; _gtr_from="${_gtr_from//[!0-9]/}"
+            _tmp="${_ioda_gtr_raw#*\"step\":}"; _gtr_step="${_tmp%%[,\}]*}"; _gtr_step="${_gtr_step//[!0-9]/}"
+            [ -z "$_gtr_from" ] && _gtr_from=0
+            [ -z "$_gtr_step" ] && _gtr_step=86400
+            _tmp="${_ioda_gtr_raw#*\"values\":\[}"; _gtr_values="${_tmp%%\]*}"
+        fi
+        if [ -n "$_gtr_values" ]; then
+            echo -e "  ${CYAN}── Google Search Traffic (IODA GTR - last 7 days) ───────────${NC}"
+            echo -e "  ${DIM}Google product traffic from Iran — drops indicate disruption${NC}"
+            echo ""
+            local _gtr_arr _gv _gi=0 _gts _gday _gmon="" _gtr_int _gtr_max=0 _gtr_chart=""
+            IFS=',' read -ra _gtr_arr <<< "$_gtr_values"
+            for _gv in "${_gtr_arr[@]}"; do
+                _gts=$(( _gtr_from + (_gi * _gtr_step) ))
+                _gi=$((_gi + 1))
+                [ "$_gts" -ge "$_ic_now_epoch" ] 2>/dev/null && continue
+                _gtr_int="${_gv%%.*}"; _gtr_int="${_gtr_int//[!0-9]/}"
+                [ -z "$_gtr_int" ] && _gtr_int=0
+                [ "$_gtr_int" -gt "$_gtr_max" ] 2>/dev/null && _gtr_max="$_gtr_int"
+            done
+            [ "$_gtr_max" -eq 0 ] && _gtr_max=1
+            _gi=0
+            for _gv in "${_gtr_arr[@]}"; do
+                _gts=$(( _gtr_from + (_gi * _gtr_step) ))
+                _gi=$((_gi + 1))
+                [ "$_gts" -ge "$_ic_now_epoch" ] 2>/dev/null && continue
+                _gtr_int="${_gv%%.*}"; _gtr_int="${_gtr_int//[!0-9]/}"
+                [ -z "$_gtr_int" ] && _gtr_int=0
+                _gday=$(date -u -d "@$_gts" +"%m %d" 2>/dev/null)
+                if [ -n "$_gday" ]; then
+                    [ -z "$_gmon" ] && { _psi_month "${_gday%% *}"; _gmon="$_MN"; }
+                    _gtr_chart+="${_gtr_int} ${_gday##* }"$'\n'
+                fi
+            done
+            [ -n "$_gtr_chart" ] && _psi_vchart "${YELLOW}" "$_gtr_chart" "$_gmon" "nolist"
+            echo ""
+        fi
+
+        # =============================================================
+        # 8. IODA LATENCY & PACKET LOSS
+        # =============================================================
+        local _show_net_quality=false
+        local _latency_val="" _loss_val=""
+        if [ -n "$_ioda_latency_raw" ]; then
+            # Response has nested: "agg_values":{"median_latency":193.38,...}
+            local _tmp
+            _tmp="${_ioda_latency_raw#*\"median_latency\":}"; _latency_val="${_tmp%%[,\}]*}"
+            _latency_val="${_latency_val%%.*}"; _latency_val="${_latency_val//[!0-9]/}"
+            [ -n "$_latency_val" ] && [ "$_latency_val" != "$_ioda_latency_raw" ] && _show_net_quality=true || _latency_val=""
+        fi
+        if [ -n "$_ioda_loss_raw" ]; then
+            # Response has nested: "agg_values":{"loss_pct":34.43,...}
+            local _tmp
+            _tmp="${_ioda_loss_raw#*\"loss_pct\":}"; _loss_val="${_tmp%%[,\}]*}"
+            _loss_val="${_loss_val%%.*}"; _loss_val="${_loss_val//[!0-9]/}"
+            [ -n "$_loss_val" ] && [ "$_loss_val" != "$_ioda_loss_raw" ] && _show_net_quality=true || _loss_val=""
+        fi
+        if $_show_net_quality; then
+            echo -e "  ${CYAN}── Network Quality (IODA Active Probing) ─────────────────────${NC}"
+            echo ""
+            local _lat_clr="${GREEN}" _loss_clr="${GREEN}"
+            if [ -n "$_latency_val" ]; then
+                [ "$_latency_val" -gt 500 ] 2>/dev/null && _lat_clr="${RED}"
+                [ "$_latency_val" -gt 200 ] 2>/dev/null && [ "$_latency_val" -le 500 ] 2>/dev/null && _lat_clr="${YELLOW}"
+                echo -e "  Avg Latency:    ${_lat_clr}${_latency_val} ms${NC}"
+            fi
+            if [ -n "$_loss_val" ]; then
+                [ "$_loss_val" -gt 10 ] 2>/dev/null && _loss_clr="${RED}"
+                [ "$_loss_val" -gt 3 ] 2>/dev/null && [ "$_loss_val" -le 10 ] 2>/dev/null && _loss_clr="${YELLOW}"
+                echo -e "  Packet Loss:    ${_loss_clr}${_loss_val}%${NC}"
+            fi
+            echo ""
+        fi
+
+        # =============================================================
+        # 9. MESSAGING APP REACHABILITY (OONI)
+        # =============================================================
+        local _has_msg_data=false
+        local _msg_name _msg_raw _msg_ok _msg_anom _msg_total _msg_pct
+        for _msg_name in Telegram WhatsApp Signal Facebook; do
+            _msg_raw=""
+            case "$_msg_name" in
+                Telegram) _msg_raw="$_ooni_tg_raw" ;;
+                WhatsApp) _msg_raw="$_ooni_wa_raw" ;;
+                Signal) _msg_raw="$_ooni_sig_raw" ;;
+                Facebook) _msg_raw="$_ooni_fb_raw" ;;
+            esac
+            [ -n "$_msg_raw" ] && _has_msg_data=true
+        done
+
+        if $_has_msg_data; then
+            echo -e "  ${CYAN}── Messaging App Reachability (OONI - last 7 days) ──────────${NC}"
+            echo ""
+            printf "  ${DIM}%-12s %8s %8s   %-20s${NC}\n" "App" "Success" "Tests" ""
+
+            for _msg_name in Telegram WhatsApp Signal Facebook; do
+                _msg_raw=""
+                case "$_msg_name" in
+                    Telegram) _msg_raw="$_ooni_tg_raw" ;;
+                    WhatsApp) _msg_raw="$_ooni_wa_raw" ;;
+                    Signal) _msg_raw="$_ooni_sig_raw" ;;
+                    Facebook) _msg_raw="$_ooni_fb_raw" ;;
+                esac
+                if [ -n "$_msg_raw" ]; then
+                    local _tmp
+                    _tmp="${_msg_raw#*\"ok_count\":}"; _msg_ok="${_tmp%%[,\}]*}"; _msg_ok="${_msg_ok//[!0-9]/}"
+                    _tmp="${_msg_raw#*\"anomaly_count\":}"; _msg_anom="${_tmp%%[,\}]*}"; _msg_anom="${_msg_anom//[!0-9]/}"
+                    _tmp="${_msg_raw#*\"measurement_count\":}"; _msg_total="${_tmp%%[,\}]*}"; _msg_total="${_msg_total//[!0-9]/}"
+                    _msg_ok="${_msg_ok:-0}"; _msg_anom="${_msg_anom:-0}"; _msg_total="${_msg_total:-0}"
+                    if [ "$_msg_total" -gt 0 ] 2>/dev/null; then
+                        _msg_pct=$(( (_msg_ok * 100) / _msg_total ))
+                    else
+                        _msg_pct=0
+                    fi
+                    local _msg_clr="${GREEN}"
+                    [ "$_msg_pct" -lt 70 ] && _msg_clr="${YELLOW}"
+                    [ "$_msg_pct" -lt 30 ] && _msg_clr="${RED}"
+                    local _msg_blen=$(( _msg_pct / 5 ))
+                    [ "$_msg_blen" -lt 0 ] && _msg_blen=0
+                    [ "$_msg_blen" -gt 20 ] && _msg_blen=20
+                    local _msg_elen=$(( 20 - _msg_blen ))
+                    local _msg_bar="${_msg_clr}${_BARS:0:$_msg_blen}${NC}${DIM}${_EMPTY:0:$_msg_elen}${NC}"
+                    _psi_fmt_num "$_msg_total"
+                    printf "  %-12s %7s%% %8s   ${_msg_bar}\n" "$_msg_name" "$_msg_pct" "$_FN"
+                else
+                    printf "  %-12s %8s %8s   ${DIM}no data${NC}\n" "$_msg_name" "—" "—"
+                fi
+            done
+            echo ""
+        fi
+
+        # =============================================================
+        # 10. RIPE ATLAS PROBE CONNECTIVITY
+        # =============================================================
+        local _ripe_up_cnt="" _ripe_down_cnt=""
+        if [ -n "$_ripe_up_raw" ]; then
+            local _tmp
+            _tmp="${_ripe_up_raw#*\"count\":}"; _ripe_up_cnt="${_tmp%%[,\}]*}"; _ripe_up_cnt="${_ripe_up_cnt//[!0-9]/}"
+        fi
+        if [ -n "$_ripe_down_raw" ]; then
+            local _tmp
+            _tmp="${_ripe_down_raw#*\"count\":}"; _ripe_down_cnt="${_tmp%%[,\}]*}"; _ripe_down_cnt="${_ripe_down_cnt//[!0-9]/}"
+        fi
+        if [ -n "$_ripe_up_cnt" ] || [ -n "$_ripe_down_cnt" ]; then
+            echo -e "  ${CYAN}── RIPE Atlas Probes in Iran ──────────────────────────────────${NC}"
+            echo ""
+            _ripe_up_cnt="${_ripe_up_cnt:-0}"; _ripe_down_cnt="${_ripe_down_cnt:-0}"
+            local _ripe_total=$(( _ripe_up_cnt + _ripe_down_cnt ))
+            local _ripe_pct=0
+            [ "$_ripe_total" -gt 0 ] && _ripe_pct=$(( (_ripe_up_cnt * 100) / _ripe_total ))
+            local _ripe_clr="${GREEN}"
+            [ "$_ripe_pct" -lt 70 ] && _ripe_clr="${YELLOW}"
+            [ "$_ripe_pct" -lt 40 ] && _ripe_clr="${RED}"
+            echo -e "  Connected:    ${_ripe_clr}${_ripe_up_cnt}${NC}  ${DIM}of ${_ripe_total} probes${NC}  (${_ripe_clr}${_ripe_pct}%${NC})"
+            echo -e "  Disconnected: ${DIM}${_ripe_down_cnt}${NC}"
+            echo ""
+        fi
+
+        # =============================================================
+        # FOOTER
+        # =============================================================
+        echo -e "  ${DIM}Sources: IODA (Georgia Tech) · OONI · RIPE Atlas · irinter.net${NC}"
+        echo ""
+        echo -e "  ${CYAN}[r]${NC} Refresh  ${CYAN}[i]${NC} Info  ${CYAN}[0]${NC} Back  ${DIM}(auto-refresh every 5m)${NC}"
+        echo ""
+        local _icc=""
+        # Auto-refresh: timeout = remaining cache life (min 60s) so page refreshes when cache expires
+        local _ic_timeout=$(( _cache_max - _ic_cache_age ))
+        [ "$_ic_timeout" -lt 60 ] && _ic_timeout=60
+        read -n 1 -s -r -t "$_ic_timeout" _icc < /dev/tty || { _force_refresh=true; continue; }
+        case "$_icc" in
+            r|R) _force_refresh=true; continue ;;
+            i|I) _info_iran_connectivity; continue ;;
+            *) _ic_exit=1 ;;
+        esac
+    done
+}
+
+#═══════════════════════════════════════════════════════════════════════
+# Iran Connectivity Test — ping, traceroute, MTR to Iranian endpoints
+#═══════════════════════════════════════════════════════════════════════
+
+_ir_test_install_deps() {
+    local _need=false
+    command -v traceroute &>/dev/null || _need=true
+    command -v mtr &>/dev/null || _need=true
+    if $_need; then
+        echo -e "  ${DIM}Installing network tools (traceroute, mtr)...${NC}"
+        if command -v apt-get &>/dev/null; then
+            apt-get update -qq 2>/dev/null && apt-get install -y -qq traceroute mtr-tiny iputils-ping 2>/dev/null
+        elif command -v yum &>/dev/null; then
+            yum install -y -q traceroute mtr 2>/dev/null
+        elif command -v apk &>/dev/null; then
+            apk add --no-cache traceroute mtr 2>/dev/null
+        elif command -v dnf &>/dev/null; then
+            dnf install -y -q traceroute mtr 2>/dev/null
+        elif command -v pacman &>/dev/null; then
+            pacman -Sy --noconfirm traceroute mtr 2>/dev/null
+        fi
+    fi
+}
+
+# Server list: IP|Name|City|ASN|ASN_Name|Hostname (6th field optional — used for HTTPS test)
+# ~79 curated Iranian endpoints (services, ISPs, banks, DCs, universities, regional PoPs)
+_IR_TEST_SERVERS="178.22.122.100|Shecan DNS|Tehran|43754|Asiatech|shecan.ir
+217.218.155.155|TIC DNS 1|Tehran|12880|DCI|
+217.218.127.127|TIC DNS 2|Tehran|12880|DCI|
+85.15.1.14|Shatel|Tehran|31549|Shatel|shatel.ir
+212.33.192.1|Asiatech|Tehran|43754|Asiatech|asiatech.ir
+2.144.0.1|Irancell|Tehran|44244|Irancell|irancell.ir
+188.213.72.1|Mobinnet|Tehran|50810|Mobinnet|mobinnet.ir
+212.16.74.1|ZapISP|Tehran|44889|ZapISP|
+31.25.104.1|Zi-Tel|Tehran|206065|Zi-Tel|
+185.143.233.1|ArvanCloud|Tehran|205585|ArvanCloud|arvancloud.ir
+77.104.64.1|Respina|Tehran|42337|Respina|respina.net
+185.188.104.10|Digikala|Tehran|43211|Digikala|digikala.com
+185.147.178.23|Filimo|Tehran|44932|IDPS|filimo.com
+185.147.179.11|Aparat|Tehran|44932|IDPS|aparat.com
+81.12.31.29|Torob|Tehran|51026|Mobinhost|torob.com
+212.33.194.190|Tap30|Tehran|43754|Asiatech|tapsi.ir
+94.182.176.33|Namava|Tehran|31549|Shatel|namava.ir
+2.189.68.126|Bale Messenger|Tehran|48159|TIC-IR|bale.ai
+5.106.8.151|Rubika|Tehran|197207|MCI|rubika.ir
+185.143.235.201|Varzesh3|Tehran|205585|ArvanCloud|varzesh3.com
+185.143.234.1|Eitaa|Tehran|205585|ArvanCloud|eitaa.com
+185.60.137.26|Soroush|Tehran|21341|Soroush-Rasanheh|splus.ir
+185.143.233.120|Snapp|Tehran|205585|ArvanCloud|snapp.ir
+185.165.205.129|Telewebion|Tehran|64422|Sima-Rayan|telewebion.com
+86.104.40.185|CafeBazaar|Tehran|25184|Afranet|cafebazaar.ir
+45.89.201.10|Alibaba.ir|Tehran|34947|Alibaba-Travel|alibaba.ir
+92.114.18.116|Taaghche|Tehran|47330|MobinNet|taaghche.com
+185.143.232.253|Anten.ir|Tehran|205585|ArvanCloud|anten.ir
+185.143.234.235|Jobinja|Tehran|205585|ArvanCloud|jobinja.ir
+185.143.233.235|Nobitex|Tehran|205585|ArvanCloud|nobitex.ir
+45.89.137.20|ZarinPal|Tehran|208675|Hamrah-Pardaz|zarinpal.com
+185.167.73.34|Shaparak|Tehran|49796|Shaparak|shaparak.ir
+185.143.232.201|Pasargad Bank|Tehran|205585|ArvanCloud|bpi.ir
+193.8.139.22|Saman Bank|Tehran|31182|Saman-Bank|sb24.ir
+152.89.13.54|Sharif Univ|Tehran|12660|SUT|sharif.edu
+185.211.88.131|Amirkabir Univ|Tehran|59794|AUT|aut.ac.ir
+194.225.0.10|IPM Research|Tehran|6736|IPM|ipm.ir
+185.147.176.1|Faraso|Tehran|44932|IDPS|faraso.org
+185.86.180.1|NetPitch|Tehran|48551|Sindad|
+185.213.164.1|Noavaran|Tehran|61173|GreenWeb|
+185.215.228.1|DadehNegar|Tehran|42337|Respina|
+185.228.236.11|ArvanCloud CDN|Tehran|202468|ArvanCDN|arvancloud.ir
+78.38.112.1|TIC Karaj|Karaj|58224|TIC|
+37.255.0.1|TIC Isfahan|Isfahan|58224|TIC|
+37.254.0.1|TIC Isfahan 2|Isfahan|58224|TIC|
+5.232.0.1|TIC Mashhad|Mashhad|58224|TIC|
+5.235.0.1|TIC Tabriz|Tabriz|58224|TIC|
+2.186.32.1|TIC Tabriz 2|Tabriz|58224|TIC|
+94.74.176.1|Pishgaman Shiraz|Shiraz|44208|Pishgaman|pishgaman.net
+78.39.240.1|TIC Shiraz|Shiraz|58224|TIC|
+185.236.36.1|Shiraz DC|Shiraz|48551|Sindad|
+2.182.96.1|TIC BandarAbbas|BandarAbbas|58224|TIC|
+85.185.161.1|TIC Yazd|Yazd|58224|TIC|
+78.39.246.1|TIC Kermanshah|Kermanshah|58224|TIC|
+85.185.248.1|TIC Sanandaj|Sanandaj|58224|TIC|
+94.182.0.1|Shatel Ahvaz|Ahvaz|31549|Shatel|shatel.ir
+2.187.1.1|TIC Rasht|Rasht|58224|TIC|
+2.185.128.2|TIC Hamadan|Hamadan|58224|TIC|
+2.187.192.1|TIC Qazvin|Qazvin|58224|TIC|
+80.191.161.1|TIC Kerman|Kerman|58224|TIC|
+2.187.32.2|TIC Urmia|Urmia|58224|TIC|
+78.38.168.1|TIC Arak|Arak|58224|TIC|
+80.191.250.2|TIC Gorgan|Gorgan|58224|TIC|
+217.219.166.1|TIC Sari|Sari|58224|TIC|
+80.191.174.1|TIC Zahedan|Zahedan|58224|TIC|
+5.234.192.2|TIC Zanjan|Zanjan|58224|TIC|
+2.183.0.1|TIC Bushehr|Bushehr|58224|TIC|
+2.185.192.1|TIC Khorramabad|Khorramabad|58224|TIC|
+92.42.50.130|Irancell.ir|Tehran|44244|Irancell|irancell.ir
+188.213.72.112|Mobinnet.ir|Tehran|50810|Mobinnet|mobinnet.ir
+80.75.12.17|Afranet.com|Tehran|25184|Afranet|afranet.com
+77.104.74.208|Respina.net|Tehran|42337|Respina|respina.net
+77.36.149.173|IRIB|Tehran|42586|IRIB|irib.ir
+45.157.244.26|Fars News|Tehran|62229|FarsNews|farsnews.ir
+185.53.142.188|SibApp|Tehran|51026|Mobinhost|sibapp.com
+185.126.18.154|Pishgaman DC|Tehran|49100|Pishgaman|pishgaman.net
+85.15.17.13|Shatel.ir|Tehran|31549|Shatel|shatel.ir
+185.98.112.170|Asiatech.ir|Tehran|43754|Asiatech|asiatech.ir
+185.120.222.22|Myket|Tehran|43754|Asiatech|myket.ir
+78.157.43.1|Electro Net|Tehran|62442|Samane-Fanava|
+185.188.104.1|Digikala DC|Tehran|43211|Digikala|digikala.com
+185.188.105.1|Digikala DC 2|Tehran|43211|Digikala|
+92.114.18.1|MobinNet DC|Tehran|47330|MobinNet|
+185.60.136.1|Soroush DC|Tehran|21341|Soroush-Rasanheh|
+94.74.177.1|Pishgaman Shiraz 2|Shiraz|44208|Pishgaman|
+185.53.143.1|Mobinhost DC|Tehran|51026|Mobinhost|
+185.236.37.1|Sindad DC|Shiraz|48551|Sindad|
+94.74.179.1|Pishgaman Shiraz 3|Shiraz|44208|Pishgaman|"
+
+# Parse ping output: extract avg latency and loss — sets _PING_AVG and _PING_LOSS
+_ir_parse_ping() {
+    _PING_AVG="" _PING_LOSS="100"
+    [ ! -f "$1" ] && return 1
+    local _line
+    # Extract rtt avg: "rtt min/avg/max/mdev = 1.0/2.0/3.0/0.5 ms" or "round-trip min/avg/max..."
+    while IFS= read -r _line; do
+        case "$_line" in
+            *min/avg/max*)
+                # Get the 4-number group: "1.0/2.0/3.0/0.5"
+                local _nums="${_line#*= }"; _nums="${_nums%% *}"
+                # Extract avg (second field)
+                local _a="${_nums#*/}"; _a="${_a%%/*}"
+                _PING_AVG="${_a%%.*}"
+                ;;
+            *packet\ loss*)
+                # "3 packets transmitted, 3 received, 0% packet loss"
+                local _p="${_line%%\%*}"
+                _p="${_p##* }"
+                _PING_LOSS="${_p//[!0-9]/}"
+                ;;
+        esac
+    done < "$1"
+    [ -n "$_PING_AVG" ] && return 0 || return 1
+}
+
+# Convert curl time_total (seconds) to milliseconds — sets _CURL_MS
+_ir_curl_to_ms() {
+    _CURL_MS=""
+    local _ts="$1"
+    [ -z "$_ts" ] && return 1
+    [ "$_ts" = "0.000000" ] && return 1
+    local _w="${_ts%%.*}" _f="${_ts#*.}"
+    _f="${_f:0:3}"
+    while [ "${#_f}" -lt 3 ]; do _f="${_f}0"; done
+    _CURL_MS=$(( _w * 1000 + 10#${_f} ))
+    return 0
+}
+
+# Filter server list — $1=filter (all|city:X|asn:X), output to stdout
+_ir_filter_servers() {
+    local _filter="${1:-all}" _s _ip _name _city _asn _aname _host
+    while IFS= read -r _s; do
+        [ -z "$_s" ] && continue
+        IFS='|' read -r _ip _name _city _asn _aname _host <<< "$_s"
+        case "$_filter" in
+            all) echo "$_s" ;;
+            city:*) [ "$_city" = "${_filter#city:}" ] && echo "$_s" ;;
+            asn:*) [ "$_asn" = "${_filter#asn:}" ] && echo "$_s" ;;
+        esac
+    done <<< "$_IR_TEST_SERVERS"
+}
+
+# Quick Test — combined HTTPS + ICMP for all servers
+_ir_quick_test() {
+    local _filter="${1:-all}"
+    local _tmpdir
+    _tmpdir=$(mktemp -d) || { echo "  Failed to create temp directory"; read -n 1 -s -r -p "  Press any key..." < /dev/tty || true; return 1; }
+
+    clear
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  QUICK TEST${NC}  ${DIM}(HTTPS + ICMP combined)${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+
+    # Get filtered server list
+    local _test_list=""
+    _test_list=$(_ir_filter_servers "$_filter")
+
+    local _total=0 _n_https=0 _n_icmp=0 _s
+    while IFS= read -r _s; do
+        [ -z "$_s" ] && continue
+        _total=$((_total+1))
+        local _h="${_s##*|}"
+        [ -n "$_h" ] && _n_https=$((_n_https+1)) || _n_icmp=$((_n_icmp+1))
+    done <<< "$_test_list"
+
+    echo -e "  ${DIM}Testing ${_total} servers (${_n_https} HTTPS + ${_n_icmp} ICMP)...${NC}"
+    echo ""
+
+    # Launch parallel tests — HTTPS for services, ICMP for infra
+    local _ip _name _city _asn _aname _host
+    while IFS= read -r _s; do
+        [ -z "$_s" ] && continue
+        IFS='|' read -r _ip _name _city _asn _aname _host <<< "$_s"
+        if [ -n "$_host" ]; then
+            curl -o /dev/null -s -w '%{http_code} %{time_total}\n' --max-time 10 -k \
+                "https://${_host}/favicon.ico" > "$_tmpdir/${_ip}.https" 2>/dev/null &
+            ping -c 1 -W 3 "$_ip" > "$_tmpdir/${_ip}.icmp" 2>&1 &
+        else
+            ping -c 1 -W 3 "$_ip" > "$_tmpdir/${_ip}.icmp" 2>&1 &
+        fi
+    done <<< "$_test_list"
+    wait
+
+    # Display results sorted by city
+    local _sorted _current_city=""
+    _sorted=$(echo "$_test_list" | sort -t'|' -k3,3 -k2,2)
+    local _reachable=0 _total_lat=0 _min_lat=999999 _max_lat=0
+    local _min_name="" _max_name=""
+    local _BARS="████████████████████"
+    local _EMPTY="░░░░░░░░░░░░░░░░░░░░"
+
+    while IFS= read -r _s; do
+        [ -z "$_s" ] && continue
+        IFS='|' read -r _ip _name _city _asn _aname _host <<< "$_s"
+
+        # City header
+        if [ "$_city" != "$_current_city" ]; then
+            [ -n "$_current_city" ] && echo ""
+            echo -e "  ${CYAN}── ${_city} ─────────────────────────────────────────────────${NC}"
+            _current_city="$_city"
+        fi
+
+        local _lat_str="---" _status="${RED}●${NC}" _lat_clr="" _method="" _lat_int=0 _got_result=false
+        local _https_lat=0 _icmp_lat=0 _has_https=false _has_icmp=false
+
+        # Check HTTPS result (for services with hostnames)
+        if [ -n "$_host" ] && [ -f "$_tmpdir/${_ip}.https" ]; then
+            local _result
+            _result=$(cat "$_tmpdir/${_ip}.https" 2>/dev/null)
+            local _http_code="${_result%% *}" _time_sec="${_result##* }"
+            if [ -n "$_http_code" ] && [ "$_http_code" -gt 0 ] 2>/dev/null; then
+                if _ir_curl_to_ms "$_time_sec"; then
+                    _https_lat="$_CURL_MS"
+                    _has_https=true
+                fi
+            fi
+        fi
+
+        # Check ICMP result
+        if [ -f "$_tmpdir/${_ip}.icmp" ]; then
+            if _ir_parse_ping "$_tmpdir/${_ip}.icmp"; then
+                _icmp_lat="${_PING_AVG:-0}"
+                _has_icmp=true
+            fi
+        fi
+
+        # Pick the best (lowest) latency when both available
+        local _icmp_extra=""
+        if $_has_https && $_has_icmp; then
+            if [ "$_icmp_lat" -le "$_https_lat" ] 2>/dev/null; then
+                _lat_int="$_icmp_lat"; _method="ICMP"
+                _icmp_extra=" ${DIM}(https:${_https_lat}ms)${NC}"
+            else
+                _lat_int="$_https_lat"; _method="HTTPS"
+                _icmp_extra=" ${DIM}(icmp:${_icmp_lat}ms)${NC}"
+            fi
+            _got_result=true
+        elif $_has_https; then
+            _lat_int="$_https_lat"; _method="HTTPS"
+            _got_result=true
+        elif $_has_icmp; then
+            _lat_int="$_icmp_lat"; _method="ICMP"
+            _got_result=true
+        fi
+        $_got_result && _lat_str="${_lat_int}ms"
+
+        if $_got_result; then
+            _reachable=$((_reachable + 1))
+            _total_lat=$((_total_lat + _lat_int))
+            [ "$_lat_int" -lt "$_min_lat" ] 2>/dev/null && { _min_lat="$_lat_int"; _min_name="$_name"; }
+            [ "$_lat_int" -gt "$_max_lat" ] 2>/dev/null && { _max_lat="$_lat_int"; _max_name="$_name"; }
+            if [ "$_lat_int" -lt 300 ] 2>/dev/null; then
+                _status="${GREEN}●${NC}"; _lat_clr="${GREEN}"
+            elif [ "$_lat_int" -lt 1000 ] 2>/dev/null; then
+                _status="${YELLOW}●${NC}"; _lat_clr="${YELLOW}"
+            else
+                _status="${RED}●${NC}"; _lat_clr="${RED}"
+            fi
+            printf "  %b %-18s ${_lat_clr}%6s${NC}  ${DIM}%-5s${NC} ${DIM}AS%-6s %s${NC}%b\n" \
+                "$_status" "$_name" "$_lat_str" "$_method" "$_asn" "$_aname" "$_icmp_extra"
+        else
+            printf "  %b %-18s ${RED}%6s${NC}  ${DIM}%-5s${NC} ${DIM}AS%-6s %s${NC}\n" \
+                "$_status" "$_name" "$_lat_str" "FAIL" "$_asn" "$_aname"
+        fi
+    done <<< "$_sorted"
+
+    # Summary
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    local _reach_pct=0
+    [ "$_total" -gt 0 ] && _reach_pct=$(( (_reachable * 100) / _total ))
+    local _reach_clr="${GREEN}"
+    [ "$_reach_pct" -lt 70 ] && _reach_clr="${YELLOW}"
+    [ "$_reach_pct" -lt 40 ] && _reach_clr="${RED}"
+    local _rblen=$(( _reach_pct / 5 ))
+    [ "$_rblen" -gt 20 ] && _rblen=20
+    local _relen=$(( 20 - _rblen ))
+    echo -e "  Reachable: ${_reach_clr}${_reachable}/${_total}${NC} (${_reach_clr}${_reach_pct}%${NC})  ${_reach_clr}${_BARS:0:$_rblen}${NC}${DIM}${_EMPTY:0:$_relen}${NC}"
+    if [ "$_reachable" -gt 0 ]; then
+        local _avg_lat=$(( _total_lat / _reachable ))
+        echo -e "  Avg Latency:  ${BOLD}${_avg_lat}ms${NC}"
+        [ "$_min_lat" -lt 999999 ] && echo -e "  Fastest:      ${GREEN}${_min_lat}ms${NC}  ${DIM}(${_min_name})${NC}"
+        [ "$_max_lat" -gt 0 ] && echo -e "  Slowest:      ${YELLOW}${_max_lat}ms${NC}  ${DIM}(${_max_name})${NC}"
+    fi
+    echo ""
+    echo -e "  ${DIM}HTTPS = service response via curl | ICMP = ping for infra IPs${NC}"
+    echo ""
+    rm -rf "$_tmpdir"
+    read -n 1 -s -r -p "  Press any key to return..." < /dev/tty || true
+}
+
+# Stability Test — 20 pings per server, packet loss, jitter, quality score
+_ir_stability_test() {
+    local _filter="${1:-all}"
+    local _tmpdir
+    _tmpdir=$(mktemp -d) || { echo "  Failed to create temp directory"; read -n 1 -s -r -p "  Press any key..." < /dev/tty || true; return 1; }
+
+    clear
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  STABILITY TEST${NC}  ${DIM}(20 pings — loss, jitter & quality)${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+
+    # Get filtered server list
+    local _test_list=""
+    _test_list=$(_ir_filter_servers "$_filter")
+
+    local _total=0 _s
+    while IFS= read -r _s; do [ -n "$_s" ] && _total=$((_total+1)); done <<< "$_test_list"
+
+    echo -e "  ${DIM}Running stability test: 20 pings x ${_total} servers...${NC}"
+    echo -e "  ${DIM}This takes 30-60 seconds. Please wait.${NC}"
+    echo ""
+
+    # Launch parallel pings (20 count, 0.5s interval)
+    while IFS= read -r _s; do
+        [ -z "$_s" ] && continue
+        local _pip="${_s%%|*}"
+        ping -c 20 -W 3 -i 0.5 "$_pip" > "$_tmpdir/${_pip}" 2>&1 &
+    done <<< "$_test_list"
+
+    # Progress dots
+    local _j=0
+    while [ "$(jobs -r 2>/dev/null | wc -l)" -gt 0 ]; do
+        printf "  ${DIM}.${NC}"
+        sleep 2
+        _j=$((_j + 1))
+        [ "$_j" -gt 30 ] && break
+    done
+    wait
+    echo ""
+    echo ""
+
+    # Display results
+    local _sorted _current_city=""
+    _sorted=$(echo "$_test_list" | sort -t'|' -k3,3 -k2,2)
+    local _reachable=0 _total_loss=0 _total_jitter=0
+
+    printf "  ${DIM}%-20s %7s %5s %7s %7s %7s %s${NC}\n" \
+        "Server" "Avg" "Loss" "Min" "Max" "Jitter" "Gr"
+    echo -e "  ${DIM}$(printf '%0.s-' {1..63})${NC}"
+
+    while IFS= read -r _s; do
+        [ -z "$_s" ] && continue
+        IFS='|' read -r _ip _name _city _asn _aname _host <<< "$_s"
+
+        # City header
+        if [ "$_city" != "$_current_city" ]; then
+            [ -n "$_current_city" ] && echo ""
+            echo -e "  ${CYAN}-- ${_city} --${NC}"
+            _current_city="$_city"
+        fi
+
+        local _avg="---" _loss="100" _min="---" _max="---" _jitter="---" _grade="F" _gclr="${RED}"
+
+        if [ -f "$_tmpdir/${_ip}" ]; then
+            # Parse ping output for min/avg/max/mdev
+            local _stats_line _loss_line
+            # Parse rtt stats: "rtt min/avg/max/mdev = 1.0/2.0/3.0/0.5 ms" (3 slashes between 4 numbers)
+            _stats_line=$(sed -n 's|.*= \([0-9.]*\)/\([0-9.]*\)/\([0-9.]*\)/\([0-9.]*\) .*|\1/\2/\3/\4|p' "$_tmpdir/${_ip}" 2>/dev/null)
+            # BusyBox fallback: "round-trip min/avg/max = 1.0/2.0/3.0 ms" (3 values, no mdev)
+            [ -z "$_stats_line" ] && _stats_line=$(sed -n 's|.*= \([0-9.]*\)/\([0-9.]*\)/\([0-9.]*\) .*|\1/\2/\3/0|p' "$_tmpdir/${_ip}" 2>/dev/null)
+            _loss_line=$(sed -n 's|.* \([0-9]*\)% packet loss.*|\1|p' "$_tmpdir/${_ip}" 2>/dev/null)
+
+            if [ -n "$_stats_line" ]; then
+                local _pmin="${_stats_line%%/*}"
+                local _rest="${_stats_line#*/}"
+                local _pavg="${_rest%%/*}"
+                _rest="${_rest#*/}"
+                local _pmax="${_rest%%/*}"
+                local _pmdev="${_rest#*/}"
+
+                _min="${_pmin%%.*}"
+                _avg="${_pavg%%.*}"
+                _max="${_pmax%%.*}"
+                _jitter="${_pmdev%%.*}"
+                _loss="${_loss_line:-0}"
+
+                _reachable=$((_reachable + 1))
+                _total_loss=$((_total_loss + _loss))
+                _total_jitter=$((_total_jitter + ${_jitter:-0}))
+
+                # Quality grade based on loss + latency + jitter
+                # Latency: <300ms no penalty, 300-1000 mild, >1000 heavy
+                local _score=100
+                _score=$((_score - (_loss * 5)))
+                if [ "${_avg}" -gt 1000 ] 2>/dev/null; then
+                    _score=$((_score - 20 - ((_avg - 1000) / 50) ))
+                elif [ "${_avg}" -gt 300 ] 2>/dev/null; then
+                    _score=$((_score - ((_avg - 300) / 70) ))
+                fi
+                _score=$((_score - (${_jitter:-0} * 2)))
+                [ "$_score" -lt 0 ] && _score=0
+
+                if [ "$_score" -ge 95 ]; then _grade="A+"; _gclr="${GREEN}"
+                elif [ "$_score" -ge 85 ]; then _grade="A"; _gclr="${GREEN}"
+                elif [ "$_score" -ge 75 ]; then _grade="B+"; _gclr="${GREEN}"
+                elif [ "$_score" -ge 65 ]; then _grade="B"; _gclr="${YELLOW}"
+                elif [ "$_score" -ge 50 ]; then _grade="C"; _gclr="${YELLOW}"
+                elif [ "$_score" -ge 35 ]; then _grade="D"; _gclr="${RED}"
+                else _grade="F"; _gclr="${RED}"
+                fi
+
+                local _aclr="${GREEN}"
+                [ "${_avg}" -ge 200 ] 2>/dev/null && _aclr="${YELLOW}"
+                [ "${_avg}" -ge 500 ] 2>/dev/null && _aclr="${RED}"
+
+                local _lclr="${GREEN}"
+                [ "${_loss}" -gt 0 ] 2>/dev/null && _lclr="${YELLOW}"
+                [ "${_loss}" -ge 20 ] 2>/dev/null && _lclr="${RED}"
+
+                printf "  %-20s ${_aclr}%7s${NC} ${_lclr}%5s${NC} %7s %7s %7s ${_gclr}%2s${NC}\n" \
+                    "$_name" "${_avg}ms" "${_loss}%" "${_min}ms" "${_max}ms" "${_jitter}ms" "$_grade"
+            else
+                _loss="${_loss_line:-100}"
+                printf "  %-20s ${RED}%7s${NC} ${RED}%5s${NC} %7s %7s %7s ${RED}%2s${NC}\n" \
+                    "$_name" "---" "${_loss}%" "---" "---" "---" "F"
+            fi
+        else
+            printf "  %-20s ${RED}%7s${NC} ${RED}%5s${NC} %7s %7s %7s ${RED}%2s${NC}\n" \
+                "$_name" "---" "100%" "---" "---" "---" "F"
+        fi
+    done <<< "$_sorted"
+
+    # Summary
+    echo ""
+    echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    local _reach_pct=0
+    [ "$_total" -gt 0 ] && _reach_pct=$(( (_reachable * 100) / _total ))
+    local _reach_clr="${GREEN}"
+    [ "$_reach_pct" -lt 70 ] && _reach_clr="${YELLOW}"
+    [ "$_reach_pct" -lt 40 ] && _reach_clr="${RED}"
+    echo -e "  Reachable: ${_reach_clr}${_reachable}/${_total}${NC} (${_reach_clr}${_reach_pct}%${NC})"
+    if [ "$_reachable" -gt 0 ]; then
+        local _avg_loss=$(( _total_loss / _reachable ))
+        local _avg_jitter=$(( _total_jitter / _reachable ))
+        echo -e "  Avg Loss:    ${BOLD}${_avg_loss}%${NC}"
+        echo -e "  Avg Jitter:  ${BOLD}${_avg_jitter}ms${NC}"
+    fi
+    echo ""
+    echo -e "  ${DIM}Grade: A+=excellent B=good C=fair D=poor F=fail${NC}"
+    echo -e "  ${DIM}Score = 100 - (loss x 5) - (latency penalty) - (jitter x 2)${NC}"
+    echo ""
+    rm -rf "$_tmpdir"
+    read -n 1 -s -r -p "  Press any key to return..." < /dev/tty || true
+}
+
+# MTU Path Discovery — test path MTU to Iranian endpoints
+_ir_mtu_test() {
+    local _tmpdir
+    _tmpdir=$(mktemp -d) || { echo "  Failed to create temp directory"; read -n 1 -s -r -p "  Press any key..." < /dev/tty || true; return 1; }
+
+    clear
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  MTU DISCOVERY TEST${NC}  ${DIM}(Path MTU to Iranian destinations)${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+
+    # Targets: reliable Iranian servers across different networks + international baseline
+    local _MTU_TARGETS="178.22.122.100|Shecan DNS|Tehran|AS43754
+85.15.17.13|Shatel|Tehran|AS31549
+185.215.228.1|DadehNegar|Tehran|AS42337
+217.218.155.155|TIC DNS|Tehran|AS12880
+185.188.104.10|Digikala|Tehran|AS43211
+188.213.66.1|MobinNet|Tehran|AS47330
+185.143.233.2|ArvanCloud|Tehran|AS205585
+5.202.128.1|Pishgaman|Tehran|AS49100
+8.8.8.8|Google DNS|International|Global
+1.1.1.1|Cloudflare|International|Global"
+
+    echo -e "  ${DIM}Discovering Path MTU to Iranian destinations...${NC}"
+    echo -e "  ${DIM}(Binary search with Don't Fragment flag — takes ~15s)${NC}"
+    echo ""
+
+    # Run MTU discovery for each target in parallel
+    local _target _tip
+    while IFS= read -r _target; do
+        [ -z "$_target" ] && continue
+        IFS='|' read -r _tip _ _ _ <<< "$_target"
+        (
+            local _lo=576 _hi=1500 _best=0 _mid _psize
+            while [ "$_lo" -le "$_hi" ]; do
+                _mid=$(( (_lo + _hi) / 2 ))
+                _psize=$(( _mid - 28 ))
+                if ping -c 1 -W 2 -s "$_psize" -M do "$_tip" &>/dev/null; then
+                    _best="$_mid"
+                    _lo=$(( _mid + 1 ))
+                else
+                    _hi=$(( _mid - 1 ))
+                fi
+            done
+            echo "$_best" > "$_tmpdir/${_tip}.mtu"
+        ) &
+    done <<< "$_MTU_TARGETS"
+    wait
+
+    # Display results
+    printf "  ${DIM}%-16s %-14s %-10s %6s  %s${NC}\n" "Target" "Location" "Network" "MTU" "Status"
+    echo -e "  ${DIM}$(printf '%.0s-' {1..62})${NC}"
+
+    while IFS= read -r _target; do
+        [ -z "$_target" ] && continue
+        local _tip _tname _tloc _tasn _best
+        IFS='|' read -r _tip _tname _tloc _tasn <<< "$_target"
+        _best=0
+        [ -f "$_tmpdir/${_tip}.mtu" ] && IFS= read -r _best < "$_tmpdir/${_tip}.mtu"
+        _best="${_best:-0}"
+
+        if [ "$_best" -gt 0 ] 2>/dev/null; then
+            local _mtu_clr="${GREEN}" _mtu_status="OK"
+            [ "$_best" -lt 1400 ] 2>/dev/null && { _mtu_clr="${YELLOW}"; _mtu_status="Reduced"; }
+            [ "$_best" -lt 1200 ] 2>/dev/null && { _mtu_clr="${RED}"; _mtu_status="Low"; }
+            printf "  %-16s %-14s ${DIM}%-10s${NC} ${_mtu_clr}%6s${NC}  ${_mtu_clr}%s${NC}\n" "$_tname" "$_tloc" "$_tasn" "$_best" "$_mtu_status"
+        else
+            printf "  %-16s %-14s ${DIM}%-10s${NC} ${RED}%6s${NC}  ${RED}%s${NC}\n" "$_tname" "$_tloc" "$_tasn" "---" "Unreachable"
+        fi
+    done <<< "$_MTU_TARGETS"
+
+    echo ""
+    echo -e "  ${CYAN}── What This Means ──────────────────────────────────────────${NC}"
+    echo ""
+    echo -e "  ${GREEN}1500${NC}  ${DIM}Standard — no fragmentation, full speed${NC}"
+    echo -e "  ${YELLOW}1400-1499${NC}  ${DIM}Typical VPN/tunnel overhead${NC}"
+    echo -e "  ${RED}< 1400${NC}  ${DIM}May indicate DPI or restrictive network policies${NC}"
+    echo ""
+    echo -e "  ${DIM}Path MTU = largest packet that can reach destination without${NC}"
+    echo -e "  ${DIM}fragmentation. Lower values can reduce throughput.${NC}"
+    echo ""
+    rm -rf "$_tmpdir"
+    read -n 1 -s -r -p "  Press any key to return..." < /dev/tty || true
+}
+
+# City picker submenu
+_ir_city_menu() {
+    clear
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  TEST BY CITY${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+
+    # Collect unique cities with counts
+    local -A _city_cnt
+    local _s _city
+    while IFS= read -r _s; do
+        [ -z "$_s" ] && continue
+        IFS='|' read -r _ _ _city _ _ <<< "$_s"
+        _city_cnt[$_city]=$(( ${_city_cnt[$_city]:-0} + 1 ))
+    done <<< "$_IR_TEST_SERVERS"
+
+    local _cities=()
+    while IFS= read -r _c; do
+        [ -n "$_c" ] && _cities+=("$_c")
+    done < <(printf '%s\n' "${!_city_cnt[@]}" | sort)
+
+    local _i=1 _c
+    for _c in "${_cities[@]}"; do
+        printf "  ${CYAN}%d.${NC} %-14s ${DIM}(%d servers)${NC}\n" "$_i" "$_c" "${_city_cnt[$_c]}"
+        _i=$((_i + 1))
+    done
+    echo ""
+    echo -e "  ${CYAN}[0]${NC} Back"
+    echo ""
+
+    local _ch=""
+    read -p "  Select city: " _ch < /dev/tty || true
+    _ch="${_ch//[!0-9]/}"
+    [ -z "$_ch" ] || [ "$_ch" = "0" ] && return
+    [ "$_ch" -gt "${#_cities[@]}" ] 2>/dev/null && return
+    local _sel="${_cities[$((_ch - 1))]}"
+    _ir_quick_test "city:$_sel"
+}
+
+# ASN picker submenu
+_ir_asn_menu() {
+    clear
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  TEST BY ASN (Network Provider)${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+
+    # Collect unique ASNs with names and counts
+    local -A _asn_cnt _asn_names
+    local _s _asn _aname
+    while IFS= read -r _s; do
+        [ -z "$_s" ] && continue
+        IFS='|' read -r _ _ _ _asn _aname <<< "$_s"
+        _asn_cnt[$_asn]=$(( ${_asn_cnt[$_asn]:-0} + 1 ))
+        _asn_names[$_asn]="$_aname"
+    done <<< "$_IR_TEST_SERVERS"
+
+    local _asns=()
+    while IFS= read -r _a; do
+        [ -n "$_a" ] && _asns+=("$_a")
+    done < <(printf '%s\n' "${!_asn_cnt[@]}" | sort -n)
+
+    local _i=1 _a
+    for _a in "${_asns[@]}"; do
+        printf "  ${CYAN}%2d.${NC} AS%-6s %-14s ${DIM}(%d servers)${NC}\n" "$_i" "$_a" "${_asn_names[$_a]}" "${_asn_cnt[$_a]}"
+        _i=$((_i + 1))
+    done
+    echo ""
+    echo -e "  ${CYAN}[0]${NC} Back"
+    echo ""
+
+    local _ch=""
+    read -p "  Select ASN: " _ch < /dev/tty || true
+    _ch="${_ch//[!0-9]/}"
+    [ -z "$_ch" ] || [ "$_ch" = "0" ] && return
+    [ "$_ch" -gt "${#_asns[@]}" ] 2>/dev/null && return
+    local _sel="${_asns[$((_ch - 1))]}"
+    _ir_quick_test "asn:$_sel"
+}
+
+# Server picker for traceroute/mtr — sets _PICK_IP and _PICK_NAME
+_ir_server_picker() {
+    local _label="$1"
+    echo -e "  ${DIM}Select a server:${NC}"
+    echo ""
+
+    local _items=() _s _ip _name _city _current_city=""
+    while IFS= read -r _s; do
+        [ -z "$_s" ] && continue
+        _items+=("$_s")
+    done < <(echo "$_IR_TEST_SERVERS" | sort -t'|' -k3,3 -k2,2)
+
+    local _i=1
+    for _s in "${_items[@]}"; do
+        IFS='|' read -r _ip _name _city _ _ <<< "$_s"
+        if [ "$_city" != "$_current_city" ]; then
+            [ -n "$_current_city" ] && echo ""
+            echo -e "  ${CYAN}── ${_city} ──${NC}"
+            _current_city="$_city"
+        fi
+        printf "  ${DIM}%2d.${NC} %-22s ${DIM}%s${NC}\n" "$_i" "$_name" "$_ip"
+        _i=$((_i + 1))
+    done
+    echo ""
+    echo -e "  ${CYAN}[0]${NC} Cancel"
+    echo ""
+
+    local _ch=""
+    read -p "  Enter number: " _ch < /dev/tty || true
+    _ch="${_ch//[!0-9]/}"
+    _PICK_IP="" _PICK_NAME=""
+    [ -z "$_ch" ] || [ "$_ch" = "0" ] && return 1
+    [ "$_ch" -gt "${#_items[@]}" ] 2>/dev/null && return 1
+    local _sel="${_items[$((_ch - 1))]}"
+    _PICK_IP="${_sel%%|*}"
+    local _tmp="${_sel#*|}"; _PICK_NAME="${_tmp%%|*}"
+    return 0
+}
+
+# Traceroute
+_ir_traceroute_menu() {
+    clear
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  TRACEROUTE${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+
+    if ! _ir_server_picker "traceroute"; then return; fi
+
+    clear
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  TRACEROUTE${NC} → ${_PICK_NAME} (${_PICK_IP})"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+
+    if command -v traceroute &>/dev/null; then
+        traceroute -m 25 -w 3 "$_PICK_IP" 2>&1
+    else
+        echo -e "  ${RED}traceroute not available.${NC}"
+        echo -e "  ${DIM}Install: apt install traceroute${NC}"
+    fi
+    echo ""
+    read -n 1 -s -r -p "  Press any key to return..." < /dev/tty || true
+}
+
+# MTR analysis
+_ir_mtr_menu() {
+    clear
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  MTR ANALYSIS${NC}  ${DIM}(combined traceroute + ping statistics)${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+
+    if ! _ir_server_picker "mtr"; then return; fi
+
+    clear
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  MTR ANALYSIS${NC} → ${_PICK_NAME} (${_PICK_IP})"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "  ${DIM}Running 10 rounds of MTR... (this takes ~15 seconds)${NC}"
+    echo ""
+
+    if command -v mtr &>/dev/null; then
+        mtr -r -c 10 -w "$_PICK_IP" 2>&1
+    else
+        echo -e "  ${RED}mtr not available.${NC}"
+        echo -e "  ${DIM}Install: apt install mtr-tiny${NC}"
+    fi
+    echo ""
+    read -n 1 -s -r -p "  Press any key to return..." < /dev/tty || true
+}
+
+# Full report — pings all, summarizes by city & ASN
+_ir_full_report() {
+    local _tmpdir
+    _tmpdir=$(mktemp -d) || { echo "  Failed to create temp directory"; read -n 1 -s -r -p "  Press any key..." < /dev/tty || true; return 1; }
+
+    clear
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  FULL CONNECTIVITY REPORT${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    # Count total
+    local _total=0 _s
+    while IFS= read -r _s; do [ -n "$_s" ] && _total=$((_total+1)); done <<< "$_IR_TEST_SERVERS"
+
+    echo -e "  ${DIM}Running comprehensive test (HTTPS + ICMP × ${_total} servers)...${NC}"
+    echo -e "  ${DIM}This may take 15-30 seconds.${NC}"
+    echo ""
+
+    # Launch all tests in parallel (HTTPS for services, ICMP for all)
+    local _pip _phost
+    while IFS= read -r _s; do
+        [ -z "$_s" ] && continue
+        IFS='|' read -r _pip _ _ _ _ _phost <<< "$_s"
+        ping -c 4 -W 3 "$_pip" > "$_tmpdir/${_pip}" 2>&1 &
+        if [ -n "$_phost" ]; then
+            curl -o /dev/null -s -w '%{http_code} %{time_total}\n' --max-time 10 -k \
+                "https://${_phost}/favicon.ico" > "$_tmpdir/${_pip}.https" 2>/dev/null &
+        fi
+    done <<< "$_IR_TEST_SERVERS"
+
+    # Progress dots
+    local _j=0
+    while [ "$(jobs -r 2>/dev/null | wc -l)" -gt 0 ]; do
+        echo -ne "  ${DIM}.${NC}"
+        sleep 1
+        _j=$((_j + 1))
+        [ "$_j" -gt 30 ] && break
+    done
+    wait
+    echo ""
+
+    # Parse all results
+    local -A _city_reach _city_total _city_lat _asn_reach _asn_total _asn_lat _asn_names
+    local _reachable=0 _total_lat=0 _min_lat=999999 _max_lat=0
+    local _min_name="" _max_name=""
+    local _ip _name _city _asn _aname _host _detail=""
+    local _BARS="████████████████████"
+    local _EMPTY="░░░░░░░░░░░░░░░░░░░░"
+
+    while IFS= read -r _s; do
+        [ -z "$_s" ] && continue
+        IFS='|' read -r _ip _name _city _asn _aname _host <<< "$_s"
+
+        _city_total[$_city]=$(( ${_city_total[$_city]:-0} + 1 ))
+        _asn_total[$_asn]=$(( ${_asn_total[$_asn]:-0} + 1 ))
+        _asn_names[$_asn]="$_aname"
+
+        # Determine best latency: use lowest of HTTPS vs ICMP
+        local _lat_int=0 _got_result=false _method=""
+        local _fr_https_lat=0 _fr_icmp_lat=0 _fr_has_https=false _fr_has_icmp=false
+        # Check HTTPS
+        if [ -n "$_host" ] && [ -f "$_tmpdir/${_ip}.https" ]; then
+            local _hresult
+            _hresult=$(cat "$_tmpdir/${_ip}.https" 2>/dev/null)
+            local _hcode="${_hresult%% *}" _htime="${_hresult##* }"
+            if [ "$_hcode" -gt 0 ] 2>/dev/null && _ir_curl_to_ms "$_htime"; then
+                _fr_https_lat="$_CURL_MS"
+                _fr_has_https=true
+            fi
+        fi
+        # Check ICMP
+        if _ir_parse_ping "$_tmpdir/${_ip}" 2>/dev/null; then
+            _fr_icmp_lat="${_PING_AVG:-0}"
+            _fr_has_icmp=true
+        fi
+        # Pick lowest
+        if $_fr_has_https && $_fr_has_icmp; then
+            if [ "$_fr_icmp_lat" -le "$_fr_https_lat" ] 2>/dev/null; then
+                _lat_int="$_fr_icmp_lat"; _method="ICMP"
+            else
+                _lat_int="$_fr_https_lat"; _method="HTTPS"
+            fi
+            _got_result=true
+        elif $_fr_has_https; then
+            _lat_int="$_fr_https_lat"; _method="HTTPS"; _got_result=true
+        elif $_fr_has_icmp; then
+            _lat_int="$_fr_icmp_lat"; _method="ICMP"; _got_result=true
+        fi
+        # ICMP loss: from ping if available; if HTTPS reachable but ICMP blocked, don't penalize
+        local _ploss="100"
+        if _ir_parse_ping "$_tmpdir/${_ip}" 2>/dev/null; then
+            _ploss="${_PING_LOSS:-0}"
+        elif $_got_result; then
+            _ploss="0"  # Reachable via HTTPS — don't penalize for ICMP block
+        fi
+
+        if $_got_result; then
+            _reachable=$((_reachable + 1))
+            _total_lat=$((_total_lat + _lat_int))
+            _city_reach[$_city]=$(( ${_city_reach[$_city]:-0} + 1 ))
+            _city_lat[$_city]=$(( ${_city_lat[$_city]:-0} + _lat_int ))
+            _asn_reach[$_asn]=$(( ${_asn_reach[$_asn]:-0} + 1 ))
+            _asn_lat[$_asn]=$(( ${_asn_lat[$_asn]:-0} + _lat_int ))
+            [ "$_lat_int" -lt "$_min_lat" ] 2>/dev/null && { _min_lat="$_lat_int"; _min_name="$_name ($_city)"; }
+            [ "$_lat_int" -gt "$_max_lat" ] 2>/dev/null && { _max_lat="$_lat_int"; _max_name="$_name ($_city)"; }
+            local _sc="${GREEN}●${NC}"
+            [ "$_lat_int" -ge 500 ] 2>/dev/null && _sc="${RED}●${NC}"
+            [ "$_lat_int" -ge 200 ] 2>/dev/null && [ "$_lat_int" -lt 500 ] 2>/dev/null && _sc="${YELLOW}●${NC}"
+            # Quality grade — latency thresholds tuned for international testing
+            # <300ms = no penalty, 300-1000 = mild, 1000-3000 = moderate, >3000 = heavy
+            local _qs=100
+            _qs=$((_qs - (_ploss * 5)))
+            if [ "$_lat_int" -gt 3000 ] 2>/dev/null; then
+                _qs=$((_qs - 60))
+            elif [ "$_lat_int" -gt 1000 ] 2>/dev/null; then
+                _qs=$((_qs - 20 - ((_lat_int - 1000) / 50) ))
+            elif [ "$_lat_int" -gt 300 ] 2>/dev/null; then
+                _qs=$((_qs - ((_lat_int - 300) / 70) ))
+            fi
+            [ "$_qs" -lt 0 ] && _qs=0
+            local _qg="F" _qc="${RED}"
+            if [ "$_qs" -ge 95 ]; then _qg="A+"; _qc="${GREEN}"
+            elif [ "$_qs" -ge 85 ]; then _qg="A"; _qc="${GREEN}"
+            elif [ "$_qs" -ge 75 ]; then _qg="B+"; _qc="${GREEN}"
+            elif [ "$_qs" -ge 65 ]; then _qg="B"; _qc="${YELLOW}"
+            elif [ "$_qs" -ge 50 ]; then _qg="C"; _qc="${YELLOW}"
+            elif [ "$_qs" -ge 35 ]; then _qg="D"; _qc="${RED}"
+            fi
+            _detail+="$(printf "  %b %-18s %-12s %7s %5s ${_qc}%-2s${NC}  ${DIM}%-5s${NC} AS%-6s" "$_sc" "$_name" "$_city" "${_lat_int}ms" "${_ploss}%" "$_qg" "$_method" "$_asn")"$'\n'
+        else
+            _detail+="$(printf "  ${RED}●${NC} %-18s %-12s ${RED}%7s${NC} %5s ${RED}%-2s${NC}  ${DIM}%-5s${NC} AS%-6s" "$_name" "$_city" "---" "100%" "F" "FAIL" "$_asn")"$'\n'
+        fi
+    done <<< "$_IR_TEST_SERVERS"
+
+    # Display report
+    clear
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}  IRAN CONNECTIVITY REPORT${NC}"
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "  ${DIM}Date:$(date -u +" %Y-%m-%d %H:%M UTC" 2>/dev/null)${NC}"
+    echo -e "  ${DIM}From: $(hostname 2>/dev/null || echo "unknown")${NC}"
+    echo ""
+
+    # Overview
+    echo -e "  ${CYAN}── Overview ──────────────────────────────────────────────────${NC}"
+    echo ""
+    local _reach_pct=0
+    [ "$_total" -gt 0 ] && _reach_pct=$(( (_reachable * 100) / _total ))
+    local _reach_clr="${GREEN}"
+    [ "$_reach_pct" -lt 70 ] && _reach_clr="${YELLOW}"
+    [ "$_reach_pct" -lt 40 ] && _reach_clr="${RED}"
+    local _rblen=$(( _reach_pct / 5 ))
+    [ "$_rblen" -gt 20 ] && _rblen=20
+    local _relen=$(( 20 - _rblen ))
+    echo -e "  Reachable:  ${_reach_clr}${_reachable}/${_total}${NC}  ${_reach_clr}${_BARS:0:$_rblen}${NC}${DIM}${_EMPTY:0:$_relen}${NC}  ${_reach_clr}${_reach_pct}%${NC}"
+    if [ "$_reachable" -gt 0 ]; then
+        local _avg_lat=$(( _total_lat / _reachable ))
+        echo -e "  Avg Latency:  ${BOLD}${_avg_lat}ms${NC}"
+        [ "$_min_lat" -lt 999999 ] && echo -e "  Fastest:      ${GREEN}${_min_lat}ms${NC}  ${DIM}${_min_name}${NC}"
+        [ "$_max_lat" -gt 0 ] && echo -e "  Slowest:      ${YELLOW}${_max_lat}ms${NC}  ${DIM}${_max_name}${NC}"
+        # Overall quality grade — weighted: reachability 50%, latency 50%
+        # Reachability: 98% = full marks, each % below costs 2 pts
+        # Latency: <300ms = full marks, scaled penalty above
+        local _oqs=100
+        local _unreachable_pct=$(( ((_total - _reachable) * 100) / _total ))
+        _oqs=$((_oqs - (_unreachable_pct * 2)))
+        if [ "$_avg_lat" -gt 3000 ] 2>/dev/null; then
+            _oqs=$((_oqs - 50))
+        elif [ "$_avg_lat" -gt 1000 ] 2>/dev/null; then
+            _oqs=$((_oqs - 15 - ((_avg_lat - 1000) / 60) ))
+        elif [ "$_avg_lat" -gt 300 ] 2>/dev/null; then
+            _oqs=$((_oqs - ((_avg_lat - 300) / 50) ))
+        fi
+        [ "$_oqs" -lt 0 ] && _oqs=0
+        local _oqg="F" _oqc="${RED}"
+        if [ "$_oqs" -ge 95 ]; then _oqg="A+"; _oqc="${GREEN}"
+        elif [ "$_oqs" -ge 85 ]; then _oqg="A"; _oqc="${GREEN}"
+        elif [ "$_oqs" -ge 75 ]; then _oqg="B+"; _oqc="${GREEN}"
+        elif [ "$_oqs" -ge 65 ]; then _oqg="B"; _oqc="${YELLOW}"
+        elif [ "$_oqs" -ge 50 ]; then _oqg="C"; _oqc="${YELLOW}"
+        elif [ "$_oqs" -ge 35 ]; then _oqg="D"; _oqc="${RED}"
+        fi
+        echo -e "  Quality:      ${_oqc}${_oqg}${NC}  ${DIM}(score: ${_oqs}/100)${NC}"
+    fi
+    echo ""
+
+    # By City
+    echo -e "  ${CYAN}── By City ───────────────────────────────────────────────────${NC}"
+    echo ""
+    local _c _cr _ct _cl _cp _cblen _celen _cclr _cavg
+    for _c in $(printf '%s\n' "${!_city_total[@]}" | sort); do
+        _cr="${_city_reach[$_c]:-0}"
+        _ct="${_city_total[$_c]}"
+        _cl="${_city_lat[$_c]:-0}"
+        _cp=0; [ "$_ct" -gt 0 ] && _cp=$(( (_cr * 100) / _ct ))
+        _cavg=0; [ "$_cr" -gt 0 ] && _cavg=$(( _cl / _cr ))
+        _cclr="${GREEN}"
+        [ "$_cp" -lt 70 ] && _cclr="${YELLOW}"
+        [ "$_cp" -lt 40 ] && _cclr="${RED}"
+        _cblen=$(( _cp / 5 )); [ "$_cblen" -gt 20 ] && _cblen=20
+        _celen=$(( 20 - _cblen ))
+        printf "  %-10s ${_cclr}%2d/%2d${NC}  ${_cclr}%s${NC}${DIM}%s${NC}  ${_cclr}%3d%%${NC}" "$_c" "$_cr" "$_ct" "${_BARS:0:$_cblen}" "${_EMPTY:0:$_celen}" "$_cp"
+        [ "$_cr" -gt 0 ] && printf "  ${DIM}avg %dms${NC}" "$_cavg"
+        echo ""
+    done
+    echo ""
+
+    # By ASN
+    echo -e "  ${CYAN}── By ASN ────────────────────────────────────────────────────${NC}"
+    echo ""
+    local _a _ar _at _al _ap _aclr _aavg
+    for _a in $(printf '%s\n' "${!_asn_total[@]}" | sort -n); do
+        _ar="${_asn_reach[$_a]:-0}"
+        _at="${_asn_total[$_a]}"
+        _al="${_asn_lat[$_a]:-0}"
+        _ap=0; [ "$_at" -gt 0 ] && _ap=$(( (_ar * 100) / _at ))
+        _aavg=0; [ "$_ar" -gt 0 ] && _aavg=$(( _al / _ar ))
+        _aclr="${GREEN}"
+        [ "$_ap" -lt 70 ] && _aclr="${YELLOW}"
+        [ "$_ap" -lt 40 ] && _aclr="${RED}"
+        printf "  AS%-6s %-12s ${_aclr}%d/%d${NC}" "$_a" "${_asn_names[$_a]:-?}" "$_ar" "$_at"
+        [ "$_ar" -gt 0 ] && printf "  ${DIM}avg %dms${NC}" "$_aavg"
+        echo ""
+    done
+    echo ""
+
+    # Individual results
+    echo -e "  ${CYAN}── All Servers ───────────────────────────────────────────────${NC}"
+    echo ""
+    printf "  ${DIM}  %-18s %-12s %7s %5s %-2s  %-5s %s${NC}\n" "Server" "City" "Ping" "Loss" "Gr" "Type" "ASN"
+    echo -n "$_detail"
+    echo ""
+
+    echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    rm -rf "$_tmpdir"
+    read -n 1 -s -r -p "  Press any key to return..." < /dev/tty || true
+}
+
+show_iran_test() {
+    _ir_test_install_deps
+
+    local _exit=0
+    while [ "$_exit" -eq 0 ]; do
+        clear
+        echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+        echo -e "${BOLD}  🔗 IRAN CONNECTIVITY TEST${NC}"
+        echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+        echo ""
+
+        # Count unique cities and ASNs
+        local _n_cities _n_asns _n_total=0
+        _n_cities=$(echo "$_IR_TEST_SERVERS" | grep -v '^$' | cut -d'|' -f3 | sort -u | wc -l)
+        _n_asns=$(echo "$_IR_TEST_SERVERS" | grep -v '^$' | cut -d'|' -f4 | sort -u | wc -l)
+        while IFS= read -r _s; do [ -n "$_s" ] && _n_total=$((_n_total+1)); done <<< "$_IR_TEST_SERVERS"
+        _n_cities="${_n_cities//[!0-9]/}"; _n_asns="${_n_asns//[!0-9]/}"
+
+        echo -e "  Test connectivity to ${BOLD}${_n_total}${NC} endpoints across Iran's major"
+        echo -e "  networks, cities, and autonomous systems."
+        echo ""
+        echo -e "  ${CYAN}┌──── CONNECTIVITY TESTS ────────────────────────────────────┐${NC}"
+        echo -e "  ${CYAN}│${NC}                                                            ${CYAN}│${NC}"
+        echo -e "  ${CYAN}│${NC}  ${CYAN}a.${NC} ${BOLD}⚡ Quick Test${NC}         ${DIM}HTTPS + ICMP combined${NC}            ${CYAN}│${NC}"
+        echo -e "  ${CYAN}│${NC}  ${CYAN}b.${NC} ${BOLD}📊 Stability Test${NC}    ${DIM}20 pings — loss & jitter${NC}          ${CYAN}│${NC}"
+        echo -e "  ${CYAN}│${NC}  ${CYAN}c.${NC} ${BOLD}📍 Test by City${NC}      ${DIM}Select a city to test${NC}             ${CYAN}│${NC}"
+        echo -e "  ${CYAN}│${NC}  ${CYAN}d.${NC} ${BOLD}🌐 Test by ASN${NC}       ${DIM}Select a network provider${NC}         ${CYAN}│${NC}"
+        echo -e "  ${CYAN}│${NC}                                                            ${CYAN}│${NC}"
+        echo -e "  ${CYAN}├──── DIAGNOSTICS ───────────────────────────────────────────┤${NC}"
+        echo -e "  ${CYAN}│${NC}                                                            ${CYAN}│${NC}"
+        echo -e "  ${CYAN}│${NC}  ${CYAN}e.${NC} ${BOLD}🔀 Traceroute${NC}        ${DIM}Trace network path to server${NC}      ${CYAN}│${NC}"
+        echo -e "  ${CYAN}│${NC}  ${CYAN}f.${NC} ${BOLD}📈 MTR Analysis${NC}      ${DIM}Traceroute + ping statistics${NC}      ${CYAN}│${NC}"
+        echo -e "  ${CYAN}│${NC}  ${CYAN}g.${NC} ${BOLD}📐 MTU Discovery${NC}     ${DIM}Path MTU to Iranian servers${NC}       ${CYAN}│${NC}"
+        echo -e "  ${CYAN}│${NC}                                                            ${CYAN}│${NC}"
+        echo -e "  ${CYAN}├──── REPORTS ───────────────────────────────────────────────┤${NC}"
+        echo -e "  ${CYAN}│${NC}                                                            ${CYAN}│${NC}"
+        echo -e "  ${CYAN}│${NC}  ${CYAN}h.${NC} ${BOLD}📋 Full Report${NC}       ${DIM}Complete test & quality scores${NC}    ${CYAN}│${NC}"
+        echo -e "  ${CYAN}│${NC}                                                            ${CYAN}│${NC}"
+        echo -e "  ${CYAN}└────────────────────────────────────────────────────────────┘${NC}"
+        echo ""
+        echo -e "  ${DIM}${_n_total} servers · ${_n_cities} cities · ${_n_asns} ASNs${NC}"
+        echo -e "  ${CYAN}[i]${NC} Info  ${CYAN}[0]${NC} Back"
+        echo ""
+
+        printf "  Enter choice: "
+        local _ch=""
+        read -n 1 -s -r _ch < /dev/tty || true
+        echo ""
+        case "$_ch" in
+            a|A) _ir_quick_test "all" ;;
+            b|B) _ir_stability_test "all" ;;
+            c|C) _ir_city_menu ;;
+            d|D) _ir_asn_menu ;;
+            e|E) _ir_traceroute_menu ;;
+            f|F) _ir_mtr_menu ;;
+            g|G) _ir_mtu_test ;;
+            h|H) _ir_full_report ;;
+            i|I) _info_iran_test ;;
+            *) _exit=1 ;;
+        esac
+    done
+}
+
+show_psiphon_stats() {
+    local _ps_exit=0 _force_refresh=true
+    local _BARS="████████████████████"
+    local _cache_max=21600  # 6 hours in seconds
+    while [ "$_ps_exit" -eq 0 ]; do
+        clear
+        echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+        echo -e "${BOLD}  PSIPHON NETWORK STATS${NC}"
+        echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+        echo ""
+
+        local _cs_raw="" _ps_raw="" _ir_raw="" _cache_age=0
+
+        # Check if cache is fresh (< 6 hours) — skip network if so
+        # Use oldest cache file's timestamp so the age label reflects the stalest data
+        local _need_fetch=true
+        if ! $_force_refresh && [ -f "$INSTALL_DIR/.psi_cache_cs" ]; then
+            local _now _ts_cs _ts_ps _ts_oldest
+            _now=$(date +%s)
+            _ts_cs=$(stat -c %Y "$INSTALL_DIR/.psi_cache_cs" 2>/dev/null || echo 0)
+            _ts_ps=$(stat -c %Y "$INSTALL_DIR/.psi_cache_ps" 2>/dev/null || echo "$_ts_cs")
+            _ts_oldest=$(( _ts_cs < _ts_ps ? _ts_cs : _ts_ps ))
+            _cache_age=$(( _now - _ts_oldest ))
+            if [ "$_cache_age" -lt "$_cache_max" ] 2>/dev/null; then
+                _need_fetch=false
+            fi
+        fi
+
+        if $_need_fetch; then
+            echo -e "  ${DIM}Fetching live data from Psiphon...${NC}"
+
+            # Fetch all APIs in parallel
+            local _tmpdir=$(mktemp -d /tmp/.psi_stats.XXXXXX 2>/dev/null || echo "/tmp/.psi_stats.$$")
+            mkdir -p "$_tmpdir" 2>/dev/null
+            curl -s --max-time 15 "https://stats.psianalytics.live/conduitStats" > "$_tmpdir/cs" 2>/dev/null &
+            curl -s --max-time 15 "https://stats.psianalytics.live/psiphonStats" > "$_tmpdir/ps" 2>/dev/null &
+            curl -s --max-time 15 "https://psix.ca/api/datasources/proxy/uid/000000001/query?db=psix&q=SELECT%20sum(%22rounded_count%22)%20FROM%20%22connections-extrapolate-daily%22%20WHERE%20%22client_region%22%20%3D%20%27IR%27%20AND%20time%20%3E%20now()%20-%2010d%20GROUP%20BY%20time(1d)%20fill(null)&epoch=s" > "$_tmpdir/ir" 2>/dev/null &
+            wait
+            _cs_raw=$(cat "$_tmpdir/cs" 2>/dev/null)
+            _ps_raw=$(cat "$_tmpdir/ps" 2>/dev/null)
+            _ir_raw=$(cat "$_tmpdir/ir" 2>/dev/null)
+            rm -rf "$_tmpdir" 2>/dev/null
+
+            # Validate responses are complete JSON (reject HTML errors + truncated transfers)
+            [[ "$_cs_raw" != "{"*"}" ]] && _cs_raw=""
+            [[ "$_ps_raw" != "{"*"}" ]] && _ps_raw=""
+            [[ "$_ir_raw" != "{"*"}" ]] && _ir_raw=""
+
+            # Save valid responses to cache; fall back to old cache for failed APIs
+            if [ -n "$_cs_raw" ] || [ -n "$_ps_raw" ]; then
+                [ -n "$_cs_raw" ] && printf '%s' "$_cs_raw" > "$INSTALL_DIR/.psi_cache_cs" 2>/dev/null
+                [ -n "$_ps_raw" ] && printf '%s' "$_ps_raw" > "$INSTALL_DIR/.psi_cache_ps" 2>/dev/null
+                [ -n "$_ir_raw" ] && printf '%s' "$_ir_raw" > "$INSTALL_DIR/.psi_cache_ir" 2>/dev/null
+            fi
+            # For any API that failed, try loading stale cache
+            [ -z "$_cs_raw" ] && _cs_raw=$(cat "$INSTALL_DIR/.psi_cache_cs" 2>/dev/null)
+            [ -z "$_ps_raw" ] && _ps_raw=$(cat "$INSTALL_DIR/.psi_cache_ps" 2>/dev/null)
+            [ -z "$_ir_raw" ] && _ir_raw=$(cat "$INSTALL_DIR/.psi_cache_ir" 2>/dev/null)
+            _cache_age=0
+        else
+            echo -e "  ${DIM}Loading cached data...${NC}"
+            _cs_raw=$(cat "$INSTALL_DIR/.psi_cache_cs" 2>/dev/null)
+            _ps_raw=$(cat "$INSTALL_DIR/.psi_cache_ps" 2>/dev/null)
+            _ir_raw=$(cat "$INSTALL_DIR/.psi_cache_ir" 2>/dev/null)
+        fi
+        _force_refresh=false
+
+        # Check if we got data (from network or cache)
+        if [ -z "$_cs_raw" ] && [ -z "$_ps_raw" ]; then
+            clear
+            echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+            echo -e "${BOLD}  PSIPHON NETWORK STATS${NC}"
+            echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+            echo ""
+            echo -e "  ${RED}Could not fetch data from Psiphon servers.${NC}"
+            echo -e "  ${DIM}Check your internet connection and try again.${NC}"
+            echo ""
+            echo -e "  ${CYAN}[r]${NC} Retry  ${CYAN}[0]${NC} Back"
+            echo ""
+            local _fc
+            read -n 1 -s -r _fc < /dev/tty || break
+            case "$_fc" in r|R) _force_refresh=true; continue ;; *) break ;; esac
+        fi
+
+        # Cache age label
+        local _cache_label
+        if [ "$_cache_age" -lt 60 ] 2>/dev/null; then
+            _cache_label="just now"
+        elif [ "$_cache_age" -lt 3600 ] 2>/dev/null; then
+            _cache_label="$((_cache_age / 60))m ago"
+        else
+            _cache_label="$((_cache_age / 3600))h ago"
+        fi
+
+        # Redraw header with update time
+        clear
+        echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+        echo -e "${BOLD}  PSIPHON NETWORK STATS${NC}                  ${DIM}Updated: ${_cache_label}${NC}"
+        echo -e "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+        echo ""
+
+        # Exclude today's partial data — only show complete days
+        local _today _today_local
+        _today=$(date -u +%Y-%m-%d 2>/dev/null)
+        _today_local=$(date +%Y-%m-%d 2>/dev/null)
+
+        # ============================================================
+        # DATA EXTRACTION (all parsing before any display)
+        # ============================================================
+
+        # -- conduitStats data --
+        local _split_cs="" _total_stations="" _today_stations=""
+        local _cdata="" _dates="" _regions="IR RU TM MM DE"
+        local _sr_data="" _chart_month=""
+        if [ -n "$_cs_raw" ]; then
+            _total_stations="${_cs_raw#*\"total_stations\":}"
+            _total_stations="${_total_stations%%[!0-9]*}"
+
+            _split_cs=$(echo "$_cs_raw" | sed 's/},{/}\n{/g; s/\],"/]\n"/g')
+            _today_stations=$(echo "$_split_cs" | grep '"date"' | grep '"stations"' | grep -v "\"${_today}\"" | grep -v "\"${_today_local}\"" | tail -1 | sed -n 's/.*"stations":\([0-9]*\).*/\1/p')
+
+            _cdata=$(echo "$_split_cs" | sed -n 's/.*"date":"\([0-9-]*\)".*"client_region":"\([A-Z]*\)".*"doc_count":\([0-9]*\).*/\1 \2 \3/p')
+            local _ld _lr _lc
+            while read -r _ld _lr _lc; do
+                [ -n "$_ld" ] && [ -n "$_lr" ] && printf -v "_cd${_ld//-/}${_lr}" '%s' "$_lc"
+            done <<< "$_cdata"
+
+            _dates=$(printf '%s\n' "$_cdata" | cut -d' ' -f1 | sort -u | grep -v "^${_today}$" | grep -v "^${_today_local}$" | tail -7)
+            _sr_data=$(echo "$_split_cs" | grep '"region"' | grep '"stations"' | head -10 | sed -n 's/.*"region":"\([^"]*\)".*"stations":\([0-9]*\).*/\1 \2/p')
+
+            # Get month name from first date in range
+            local _first_date
+            _first_date=$(echo "$_dates" | head -1)
+            [ -n "$_first_date" ] && { _psi_month "${_first_date:5:2}"; _chart_month="$_MN"; }
+        fi
+
+        # -- psiphonStats data --
+        local _split_ps="" _user_data="" _byte_data=""
+        if [ -n "$_ps_raw" ]; then
+            _split_ps=$(echo "$_ps_raw" | sed 's/},{/}\n{/g')
+            _user_data=$(echo "$_split_ps" | grep '"daily_unique_users"' | grep -v "\"${_today}\"" | grep -v "\"${_today_local}\"" | tail -7 | sed -n 's/.*"date":"\([^"]*\)".*"daily_unique_users":\([0-9.]*\).*/\1 \2/p')
+            _byte_data=$(echo "$_split_ps" | grep '"sum_of_bytes_value_TB"' | grep -v "\"${_today}\"" | grep -v "\"${_today_local}\"" | tail -7 | sed -n 's/.*"date":"\([^"]*\)".*"sum_of_bytes_value_TB":\([0-9.]*\).*/\1 \2/p')
+        fi
+
+        # -- InfluxDB Iran data --
+        local _irchart="" _ir_month=""
+        if [ -n "$_ir_raw" ]; then
+            local _today_epoch _local_epoch
+            _today_epoch=$(date -u -d "$_today" +%s 2>/dev/null || echo 0)
+            _local_epoch=$(date -d "$_today_local" +%s 2>/dev/null || echo "$_today_epoch")
+            [ "$_local_epoch" -lt "$_today_epoch" ] 2>/dev/null && _today_epoch="$_local_epoch"
+            local _ir_values
+            _ir_values=$(echo "$_ir_raw" | sed 's/\],\[/\n/g' | sed -n 's/[^0-9]*\([0-9]*\),\([0-9][0-9]*\).*/\1 \2/p' | while read -r _ets _ev; do
+                [ "$_ets" -lt "$_today_epoch" ] 2>/dev/null && echo "$_ets $_ev"
+            done)
+            if [ -n "$_ir_values" ]; then
+                local _ts _val _irday _ir_first_mm=""
+                while read -r _ts _val; do
+                    [ -z "$_ts" ] || [ -z "$_val" ] && continue
+                    _irday=$(date -u -d "@$_ts" +"%m %d" 2>/dev/null)
+                    [ -z "$_irday" ] && continue
+                    [ -z "$_ir_first_mm" ] && { _ir_first_mm="${_irday%% *}"; _psi_month "$_ir_first_mm"; _ir_month="$_MN"; }
+                    _irchart+="${_val} ${_irday##* }"$'\n'
+                done <<< "$_ir_values"
+            fi
+        fi
+
+        # ============================================================
+        # DISPLAY (ordered: Iran focus first, then global)
+        # ============================================================
+
+        # === CONDUIT STATIONS (header) ===
+        if [ -n "$_cs_raw" ]; then
+            _psi_fmt_num "${_today_stations:-0}"; local _factive="$_FN"
+            _psi_fmt_num "${_total_stations:-0}"; local _ftotal="$_FN"
+            echo -e "  ${BOLD}Conduit Stations:${NC} ${_factive} active  |  ${_ftotal} total"
+            echo ""
+        fi
+
+        # === 1. IRAN DAILY CONNECTIONS (vertical bar chart) ===
+        if [ -n "$_dates" ]; then
+            echo -e "  ${CYAN}── Iran Daily Connections ──────────────────────────────────${NC}"
+            echo ""
+            local _ircn_chart="" _d _cnt
+            for _d in $_dates; do
+                local _vn="_cd${_d//-/}IR"; _cnt="${!_vn:-0}"
+                _ircn_chart+="${_cnt} ${_d:8:2}"$'\n'
+            done
+            _psi_vchart "${CYAN}" "$_ircn_chart" "$_chart_month"
+            echo ""
+        fi
+
+        # === 2. DAILY UNIQUE USERS FROM IRAN (vertical bar chart) ===
+        if [ -n "$_irchart" ]; then
+            echo -e "  ${CYAN}── Daily Unique Users from Iran ─────────────────────────────${NC}"
+            echo -e "  ${DIM}Source: psix.ca (Psiphon regional metrics)${NC}"
+            echo ""
+            _psi_vchart "${GREEN}" "$_irchart" "$_ir_month"
+            echo ""
+        fi
+
+        # === 3. DAILY PSIPHON USERS (vertical bar chart) ===
+        if [ -n "$_user_data" ]; then
+            echo -e "  ${CYAN}── Daily Psiphon Users (last 7 days) ───────────────────────${NC}"
+            echo ""
+            local _uchart="" _ud _uc
+            while read -r _ud _uc; do
+                [ -z "$_ud" ] && continue
+                _uc="${_uc%%.*}"
+                _uchart+="${_uc:-0} ${_ud:8:2}"$'\n'
+            done <<< "$_user_data"
+            _psi_vchart "${CYAN}" "$_uchart" "$_chart_month"
+            echo ""
+        fi
+
+        # === 4. DAILY CONNECTIONS BY REGION (table) ===
+        if [ -n "$_dates" ]; then
+            echo -e "  ${CYAN}── Daily Connections by Region (last 7 days) ──────────────${NC}"
+            echo ""
+            printf "  ${DIM}%-12s" "Date"
+            local _r
+            for _r in $_regions; do
+                _psi_country_name "$_r"; printf "%12s" "$_CN"
+            done
+            printf "${NC}\n"
+            for _d in $_dates; do
+                _psi_month "${_d:5:2}"
+                printf "  %-12s" "$_MN ${_d:8:2}"
+                for _r in $_regions; do
+                    local _vn="_cd${_d//-/}${_r}"; _cnt="${!_vn:-0}"
+                    _psi_fmt_num "$_cnt"; printf "%12s" "$_FN"
+                done
+                printf "\n"
+            done
+            echo ""
+
+            # TOP STATION REGIONS (horizontal bar chart)
+            echo -e "  ${CYAN}── Top Station Regions ─────────────────────────────────────${NC}"
+            echo ""
+            local _sr_max=1 _sr_first=true _code _count
+            while read -r _code _count; do
+                [ -z "$_code" ] && continue
+                if $_sr_first; then _sr_max="${_count:-1}"; _sr_first=false; fi
+                [ "${_sr_max:-1}" -eq 0 ] 2>/dev/null && _sr_max=1
+                local _pct=$(( (${_count:-0} * 100) / _sr_max ))
+                local _blen=$(( _pct / 5 ))
+                [ "$_blen" -lt 1 ] && _blen=1
+                [ "$_blen" -gt 20 ] && _blen=20
+                _psi_country_name "$_code"
+                _psi_fmt_num "${_count:-0}"
+                printf "  %-16s %8s  ${GREEN}%-20s${NC}\n" "$_CN" "$_FN" "${_BARS:0:$_blen}"
+            done <<< "$_sr_data"
+            echo ""
+        fi
+
+        # === 5. DAILY DATA TRANSFERRED ===
+        if [ -n "$_byte_data" ]; then
+            echo -e "  ${CYAN}── Daily Data Transferred (last 7 days) ────────────────────${NC}"
+            echo ""
+            local _bd _btb
+            while read -r _bd _btb; do
+                [ -z "$_bd" ] && continue
+                _btb="${_btb%%.*}"
+                _psi_month "${_bd:5:2}"
+                printf "  %-8s %8s TB\n" "$_MN ${_bd:8:2}" "${_btb:-0}"
+            done <<< "$_byte_data"
+            echo ""
+        fi
+
+        echo -e "  ${CYAN}[r]${NC} Refresh  ${CYAN}[i]${NC} Info  ${CYAN}[0]${NC} Back  ${DIM}(auto-refresh every 6h)${NC}"
+        echo ""
+        local _psc
+        read -n 1 -s -r _psc < /dev/tty || break
+        case "$_psc" in
+            r|R) _force_refresh=true; continue ;;
+            i|I) _info_psiphon_stats; continue ;;
+            *) _ps_exit=1 ;;
+        esac
+    done
+}
+
 #═══════════════════════════════════════════════════════════════════════
 # Multi-Server Dashboard
 #═══════════════════════════════════════════════════════════════════════
@@ -9160,6 +12617,7 @@ load_servers() {
     SERVER_COUNT=0
     local conf="$INSTALL_DIR/servers.conf"
     [ -f "$conf" ] || return
+    chmod 600 "$conf" 2>/dev/null || true
     while IFS='|' read -r _l _c _a _rest || [ -n "$_l" ]; do
         [[ "$_l" =~ ^#.*$ ]] && continue
         [ -z "$_l" ] || [ -z "$_c" ] && continue
@@ -9213,6 +12671,7 @@ _creds_key() {
             return 1
         fi
     fi
+    chmod 600 "$keyfile" 2>/dev/null || true
     echo "$keyfile"
 }
 
@@ -9255,6 +12714,7 @@ _load_cred() {
     local label="$1"
     local credsfile="$INSTALL_DIR/servers.creds"
     [ -f "$credsfile" ] || return 1
+    chmod 600 "$credsfile" 2>/dev/null || true
     local encrypted
     encrypted=$(grep "^${label}|" "$credsfile" 2>/dev/null | head -1 | cut -d'|' -f2-)
     [ -z "$encrypted" ] && return 1
@@ -9644,6 +13104,10 @@ add_server_interactive() {
         fi
     fi
 
+    # Ensure trailing newline before appending
+    if [ -s "$INSTALL_DIR/servers.conf" ]; then
+        [ "$(tail -c 1 "$INSTALL_DIR/servers.conf" 2>/dev/null | wc -l)" -eq 0 ] && echo "" >> "$INSTALL_DIR/servers.conf"
+    fi
     echo "${label}|${conn}|${auth_type}" >> "$INSTALL_DIR/servers.conf"
     chmod 600 "$INSTALL_DIR/servers.conf" 2>/dev/null || true
     echo ""
@@ -10528,7 +13992,60 @@ _server_actions() {
         3) remote_cmd="conduit start" ;;
         4) remote_cmd="conduit update" ;;
         5) remote_cmd="conduit health" ;;
-        6) remote_cmd="conduit logs" ;;
+        6)
+            # Logs need special handling: fetch container list remotely, pick locally
+            echo ""
+            echo -e "  ${DIM}Fetching container list from ${label}...${NC}"
+            local _clist
+            _clist=$(ssh_cmd "$label" "docker ps -a --filter name=conduit --format '{{.Names}} {{.Status}}'" 2>/dev/null)
+            if [ -z "$_clist" ]; then
+                echo -e "  ${RED}Could not fetch container list.${NC}"
+                echo ""
+                echo -e "${CYAN}──────────────────────────────────────────────────────────────${NC}"
+                read -n 1 -s -r -p "  Press any key to return to dashboard..." < /dev/tty || true
+                echo -ne "\033[?25l"; clear; return
+            fi
+            # Parse containers into arrays (sorted by name)
+            local -a _cnames=() _cstates=()
+            local _cl _cn _cs
+            while read -r _cl; do
+                [ -z "$_cl" ] && continue
+                _cn="${_cl%% *}"
+                _cs="${_cl#* }"
+                _cnames+=("$_cn")
+                if echo "$_cs" | grep -qi "up"; then
+                    _cstates+=("${GREEN}Running${NC}")
+                else
+                    _cstates+=("${RED}Stopped${NC}")
+                fi
+            done <<< "$(echo "$_clist" | sort)"
+            local _ccnt=${#_cnames[@]}
+            if [ "$_ccnt" -eq 0 ]; then
+                echo -e "  ${RED}No conduit containers found.${NC}"
+                echo ""
+                echo -e "${CYAN}──────────────────────────────────────────────────────────────${NC}"
+                read -n 1 -s -r -p "  Press any key to return to dashboard..." < /dev/tty || true
+                echo -ne "\033[?25l"; clear; return
+            fi
+            local _target="${_cnames[0]}"
+            if [ "$_ccnt" -gt 1 ]; then
+                echo ""
+                echo -e "  ${CYAN}Select container to view logs:${NC}"
+                echo ""
+                local _ci
+                for (( _ci=0; _ci<_ccnt; _ci++ )); do
+                    echo -e "  $((_ci + 1)). ${_cnames[$_ci]}  [${_cstates[$_ci]}]"
+                done
+                echo ""
+                local _sel
+                read -p "  Select (1-${_ccnt}): " _sel < /dev/tty || { echo -ne "\033[?25l"; clear; return; }
+                if ! [[ "$_sel" =~ ^[0-9]+$ ]] || [ "$_sel" -lt 1 ] || [ "$_sel" -gt "$_ccnt" ]; then
+                    echo -e "  ${RED}Invalid selection.${NC}"; sleep 1; echo -ne "\033[?25l"; clear; return
+                fi
+                _target="${_cnames[$((_sel - 1))]}"
+            fi
+            remote_cmd="docker logs --tail 50 $_target"
+            ;;
         7) remote_cmd="conduit status" ;;
         b|B|"") echo -ne "\033[?25l"; clear; return ;;
         *) echo -e "${RED}  Invalid choice.${NC}"; sleep 1; echo -ne "\033[?25l"; clear; return ;;
@@ -10669,6 +14186,9 @@ show_help() {
     echo "  servers      List configured remote servers"
     echo "  snowflake    Manage Snowflake proxy (status|start|stop|restart)"
     echo "  mtproto      Manage MTProto proxy (status|start|stop|restart|link)"
+    echo "  network-stats Show Psiphon network statistics"
+    echo "  iran-status   Iran connectivity status (IODA, OONI)"
+    echo "  iran-test     Iran connectivity test (ping, traceroute, MTR)"
     echo "  uninstall    Remove everything (container, data, service)"
     echo "  menu         Open interactive menu (default)"
     echo "  version      Show version information"
@@ -11287,6 +14807,9 @@ case "${1:-menu}" in
     regen-tracker) setup_tracker_service 2>/dev/null ;;
     regen-telegram) [ "${TELEGRAM_ENABLED:-false}" = "true" ] && setup_telegram_service 2>/dev/null ;;
     dashboard)     show_multi_dashboard ;;
+    network-stats) show_psiphon_stats ;;
+    iran-status)   show_iran_connectivity ;;
+    iran-test)     show_iran_test ;;
     add-server|deploy) add_server_interactive ;;
     edit-server)   edit_server_interactive ;;
     remove-server) remove_server_interactive ;;
@@ -11331,7 +14854,8 @@ case "${1:-menu}" in
             *)  echo "Usage: conduit mtproto [status|start|stop|restart|link|remove]" ;;
         esac
         ;;
-    menu|*)   [ -t 0 ] || { show_help; exit 0; }; show_menu ;;
+    menu)     [ -t 0 ] || { show_help; exit 0; }; show_menu ;;
+    *)        echo "Unknown command: $1"; echo "Run 'conduit help' for usage."; exit 1 ;;
 esac
 MANAGEMENT
 
@@ -11691,7 +15215,7 @@ SVCEOF
     fi
 }
 #
-# REACHED END OF SCRIPT - VERSION 1.3.1
+# REACHED END OF SCRIPT - VERSION 1.3.3
 # ###############################################################################
 main "$@"
 
