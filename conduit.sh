@@ -162,6 +162,19 @@ install_package() {
     
     case "$PKG_MANAGER" in
         apt)
+            # Wait for dpkg lock if held by another process (e.g. unattended-upgrades)
+            local _apt_tries=0
+            while fuser /var/lib/dpkg/lock-frontend &>/dev/null 2>&1; do
+                if [ $_apt_tries -eq 0 ]; then
+                    log_warn "Waiting for dpkg lock (held by another process)..."
+                fi
+                _apt_tries=$((_apt_tries + 1))
+                if [ $_apt_tries -ge 30 ]; then
+                    log_error "dpkg lock held for too long, skipping $package"
+                    return 1
+                fi
+                sleep 2
+            done
             apt-get update -q || log_warn "apt-get update failed, attempting install anyway..."
             if apt-get install -y -q "$package"; then
                 log_success "$package installed successfully"
@@ -15153,7 +15166,7 @@ SVCEOF
                         systemctl restart conduit-telegram 2>/dev/null || true
                     fi
                 fi
-                exec "$INSTALL_DIR/conduit" menu
+                exec "$INSTALL_DIR/conduit" menu < /dev/tty
                 ;;
             2)
                 echo ""
