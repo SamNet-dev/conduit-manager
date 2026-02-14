@@ -10,7 +10,7 @@
                       M A N A G E R
 ```
 
-![Version](https://img.shields.io/badge/version-1.3.3-blue)
+![Version](https://img.shields.io/badge/version-1.3.4-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-Linux-orange)
 ![Docker](https://img.shields.io/badge/Docker-Required-2496ED?logo=docker&logoColor=white)
@@ -49,7 +49,13 @@ wget https://raw.githubusercontent.com/SamNet-dev/conduit-manager/main/conduit.s
 sudo bash conduit.sh
 ```
 
-## What's New in v1.3.3
+## What's New in v1.3.4
+
+- **Shir o Khorshid Client Mode** — New menu option (`s`) to switch your Conduit node between serving official Psiphon clients and [Shir o Khorshid](https://github.com/shirokhorshid/shirokhorshid-android/releases) users (an alternative Psiphon client for Iran). Supports global toggle or per-container configuration. Status dashboard and JSON output show the active client mode per container
+- **dpkg Lock Handling** — Installer now waits up to 60 seconds for `unattended-upgrades` to release the dpkg lock instead of failing immediately
+- **Piped Install Fix** — Fixed menu not opening when running via `curl | bash` (stdin redirect for terminal detection)
+
+### v1.3.3
 
 - **Iran Connectivity Status** — Real-time Iran internet monitoring dashboard with data from IODA (BGP reachability), OONI (censorship detection), irinter.net (connectivity score), and optional Cloudflare Radar. Auto-refresh every hour with 7-day charts, outage alerts, and circumvention tool reachability (Psiphon, Tor)
 - **Iran Connectivity Test** — Comprehensive network diagnostics testing 88 servers across 24 Iranian cities. Includes Quick Test (latency to all servers), Full Report (detailed per-server analysis with quality grading), Stability Test (multi-round jitter analysis), and MTU Path Discovery (binary search across 10 networks)
@@ -186,6 +192,7 @@ conduit remove-server # Remove a remote server
 ### Configuration
 ```bash
 conduit settings     # Change max-clients, bandwidth, CPU, memory per container
+conduit client-mode  # Switch between Standard and Shir o Khorshid client mode
 conduit menu         # Open interactive management menu
 ```
 
@@ -223,6 +230,7 @@ The interactive menu (`conduit menu`) provides access to all features:
 | **m** | Multi-server dashboard — manage up to 30 remote servers with live status |
 | **f** | Snowflake proxy — status, start/stop, resource configuration |
 | **p** | Telegram MTProto Proxy — setup, share link & QR, send to Telegram, resource config |
+| **s** | Conduit Client Mode — switch between Standard (Psiphon) and Shir o Khorshid, per-container support |
 | **n** | Psiphon Network Stats — global network analytics with charts and country rankings |
 | **e** | Iran Connectivity Status — real-time internet monitoring with IODA, OONI, irinter.net data |
 | **t** | Iran Connectivity Test — network diagnostics across 88 servers in 24 Iranian cities |
@@ -349,7 +357,13 @@ wget https://raw.githubusercontent.com/SamNet-dev/conduit-manager/main/conduit.s
 sudo bash conduit.sh
 ```
 
-## تازه‌های نسخه 1.3.3
+## تازه‌های نسخه 1.3.4
+
+- **حالت کلاینت شیر و خورشید** — گزینه جدید در منو (`s`) برای تغییر نود کاندوییت بین سرویس‌دهی به کلاینت‌های رسمی سایفون و کاربران [شیر و خورشید](https://github.com/shirokhorshid/shirokhorshid-android/releases) (کلاینت جایگزین سایفون برای ایران). پشتیبانی از تنظیم سراسری یا هر کانتینر به صورت جداگانه. داشبورد وضعیت و خروجی JSON حالت فعال هر کانتینر را نمایش می‌دهند
+- **مدیریت قفل dpkg** — نصب‌کننده حالا تا ۶۰ ثانیه منتظر آزاد شدن قفل dpkg توسط `unattended-upgrades` می‌ماند
+- **رفع مشکل نصب پایپ** — رفع مشکل باز نشدن منو هنگام اجرا با `curl | bash`
+
+### نسخه 1.3.3
 
 - **وضعیت اتصال ایران** — داشبورد مانیتورینگ لحظه‌ای اینترنت ایران با داده‌های IODA (دسترسی BGP)، OONI (تشخیص سانسور)، irinter.net (امتیاز اتصال) و Cloudflare Radar اختیاری. نمودارهای ۷ روزه، هشدارهای قطعی و نرخ موفقیت ابزارهای دور زدن (سایفون، تور) با بروزرسانی خودکار
 - **تست اتصال ایران** — مجموعه تشخیص شبکه با ۸۸ سرور در ۲۴ شهر ایران. شامل تست سریع (اسکن موازی تاخیر)، گزارش کامل (رتبه‌بندی کیفیت A+ تا F هر سرور)، تست پایداری (تحلیل جیتر چند مرحله‌ای) و کشف MTU مسیر (جستجوی دودویی در ۱۰ شبکه)
@@ -473,6 +487,7 @@ conduit remove-server # حذف سرور ریموت
 ### پیکربندی
 ```bash
 conduit settings     # تغییر تنظیمات هر کانتینر
+conduit client-mode  # تغییر حالت کلاینت (استاندارد / شیر و خورشید)
 conduit menu         # منوی تعاملی
 ```
 
@@ -508,6 +523,7 @@ conduit help         # راهنما
 | **m** | داشبورد چند سرور — مدیریت تا ۳۰ سرور ریموت با وضعیت زنده |
 | **f** | پروکسی اسنوفلیک — وضعیت، شروع/توقف، پیکربندی منابع |
 | **p** | پروکسی MTProto تلگرام — راه‌اندازی، اشتراک لینک و QR، ارسال به تلگرام |
+| **s** | حالت کلاینت — تغییر بین سایفون استاندارد و شیر و خورشید، پشتیبانی هر کانتینر |
 | **n** | آمار شبکه سایفون — تحلیل شبکه جهانی با نمودار و رتبه‌بندی کشوری |
 | **e** | وضعیت اتصال ایران — مانیتورینگ لحظه‌ای با داده‌های IODA، OONI و irinter.net |
 | **t** | تست اتصال ایران — تشخیص شبکه در ۸۸ سرور ۲۴ شهر ایران |

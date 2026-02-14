@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # ╔═══════════════════════════════════════════════════════════════════╗
-# ║     🚀 PSIPHON CONDUIT MANAGER v1.3.3                             ║
+# ║     🚀 PSIPHON CONDUIT MANAGER v1.3.4                             ║
 # ║                                                                   ║
 # ║  One-click setup for Psiphon Conduit                              ║
 # ║                                                                   ║
@@ -31,7 +31,7 @@ if [ -z "$BASH_VERSION" ]; then
     exit 1
 fi
 
-VERSION="1.3.3"
+VERSION="1.3.4"
 CONDUIT_IMAGE="ghcr.io/ssmirr/conduit/conduit:latest"
 INSTALL_DIR="${INSTALL_DIR:-/opt/conduit}"
 BACKUP_DIR="$INSTALL_DIR/backups"
@@ -960,7 +960,7 @@ create_management_script() {
 # Reference: https://github.com/ssmirr/conduit/releases/latest
 #
 
-VERSION="1.3.3"
+VERSION="1.3.4"
 INSTALL_DIR="REPLACE_ME_INSTALL_DIR"
 BACKUP_DIR="$INSTALL_DIR/backups"
 CONDUIT_IMAGE="ghcr.io/ssmirr/conduit/conduit:latest"
@@ -1112,6 +1112,19 @@ get_container_memory() {
     echo "${val:-${DOCKER_MEMORY:-}}"
 }
 
+get_container_compartment() {
+    local idx=${1:-1}
+    local var="COMPARTMENT_${idx}"
+    local val="${!var}"
+    if [ "$val" = "none" ]; then
+        echo ""
+    elif [ -n "$val" ]; then
+        echo "$val"
+    else
+        echo "${COMPARTMENT:-}"
+    fi
+}
+
 run_conduit_container() {
     local idx=${1:-1}
     local name=$(get_container_name $idx)
@@ -1120,6 +1133,7 @@ run_conduit_container() {
     local bw=$(get_container_bandwidth $idx)
     local cpus=$(get_container_cpus $idx)
     local mem=$(get_container_memory $idx)
+    local compartment=$(get_container_compartment $idx)
     # Remove existing container if any
     if docker ps -a 2>/dev/null | grep -q "[[:space:]]${name}$"; then
         docker rm -f "$name" 2>/dev/null || true
@@ -1127,6 +1141,8 @@ run_conduit_container() {
     local resource_args=""
     [ -n "$cpus" ] && resource_args+="--cpus $cpus "
     [ -n "$mem" ] && resource_args+="--memory $mem "
+    local compartment_args=""
+    [ -n "$compartment" ] && compartment_args="--compartment $compartment"
     # shellcheck disable=SC2086
     docker run -d \
         --name "$name" \
@@ -1137,7 +1153,7 @@ run_conduit_container() {
         --network host \
         $resource_args \
         "$CONDUIT_IMAGE" \
-        start --max-clients "$mc" --bandwidth "$bw" --stats-file
+        start --max-clients "$mc" --bandwidth "$bw" --stats-file $compartment_args
 }
 
 # ─── Snowflake Proxy Functions ─────────────────────────────────────────────────
@@ -4287,8 +4303,10 @@ status_json() {
     printf '"tracker_in_bytes":%d,"tracker_out_bytes":%d,"unique_ips":%d,' \
         "${data_in:-0}" "${data_out:-0}" "${unique_ips:-0}"
     printf '"restarts":%d,' "$total_restarts"
-    printf '"settings":{"max_clients":%d,"bandwidth":"%s","container_count":%d,"data_cap_gb":%d,"data_cap_up_gb":%d,"data_cap_down_gb":%d},' \
-        "${MAX_CLIENTS:-200}" "${BANDWIDTH:-5}" "${CONTAINER_COUNT:-1}" "${DATA_CAP_GB:-0}" "${DATA_CAP_UP_GB:-0}" "${DATA_CAP_DOWN_GB:-0}"
+    local _json_cm="${COMPARTMENT:-standard}"
+    [ -z "${COMPARTMENT:-}" ] && _json_cm="standard"
+    printf '"settings":{"max_clients":%d,"bandwidth":"%s","container_count":%d,"data_cap_gb":%d,"data_cap_up_gb":%d,"data_cap_down_gb":%d,"client_mode":"%s"},' \
+        "${MAX_CLIENTS:-200}" "${BANDWIDTH:-5}" "${CONTAINER_COUNT:-1}" "${DATA_CAP_GB:-0}" "${DATA_CAP_UP_GB:-0}" "${DATA_CAP_DOWN_GB:-0}" "$_json_cm"
     local sf_enabled="${SNOWFLAKE_ENABLED:-false}"
     local sf_running=false
     local sf_conn=0 sf_in=0 sf_out=0 sf_to=0
@@ -4589,7 +4607,11 @@ show_status() {
             local bw=$(get_container_bandwidth $i)
             local bw_d="Unlimited"
             [ "$bw" != "-1" ] && bw_d="${bw} Mbps"
-            printf "  %-12s clients: %-5s bw: %s${EL}\n" "$(get_container_name $i)" "$mc" "$bw_d"
+            local _comp=$(get_container_compartment $i)
+            local _comp_d=""
+            [ "$_comp" = "shirokhorshid" ] && _comp_d=" ${MAGENTA}[Shir o Khorshid]${NC}"
+            printf "  %-12s clients: %-5s bw: %s" "$(get_container_name $i)" "$mc" "$bw_d"
+            echo -e "${_comp_d}${EL}"
         done
     else
         echo -e "  Max Clients:  ${MAX_CLIENTS}${EL}"
@@ -4600,6 +4622,17 @@ show_status() {
         fi
         echo -e "  Containers:   ${CONTAINER_COUNT}${EL}"
     fi
+    # Show client mode
+    local _cm_label="Standard"
+    [ "${COMPARTMENT:-}" = "shirokhorshid" ] && _cm_label="${MAGENTA}Shir o Khorshid${NC}"
+    # Check for per-container overrides
+    local _cm_mixed=false
+    for i in $(seq 1 $CONTAINER_COUNT); do
+        local _cmv="COMPARTMENT_${i}"
+        [ -n "${!_cmv}" ] && { _cm_mixed=true; break; }
+    done
+    [ "$_cm_mixed" = true ] && _cm_label="${YELLOW}Mixed${NC}"
+    echo -e "  Client Mode:  ${_cm_label}${EL}"
     if _has_any_data_cap; then
         local usage=$(get_data_usage)
         local used_rx=$(echo "$usage" | awk '{print $1}')
@@ -6239,6 +6272,7 @@ MTPROTO_SECRET="${MTPROTO_SECRET:-}"
 MTPROTO_DOMAIN="${MTPROTO_DOMAIN:-google.com}"
 MTPROTO_CPUS="${MTPROTO_CPUS:-}"
 MTPROTO_MEMORY="${MTPROTO_MEMORY:-}"
+COMPARTMENT="${COMPARTMENT:-}"
 EOF
     # Save per-container overrides
     for i in $(seq 1 "$CONTAINER_COUNT"); do
@@ -6246,10 +6280,12 @@ EOF
         local bw_var="BANDWIDTH_${i}"
         local cpu_var="CPUS_${i}"
         local mem_var="MEMORY_${i}"
+        local comp_var="COMPARTMENT_${i}"
         [ -n "${!mc_var}" ] && echo "${mc_var}=\"${!mc_var}\"" >> "$_tmp"
         [ -n "${!bw_var}" ] && echo "${bw_var}=\"${!bw_var}\"" >> "$_tmp"
         [ -n "${!cpu_var}" ] && echo "${cpu_var}=\"${!cpu_var}\"" >> "$_tmp"
         [ -n "${!mem_var}" ] && echo "${mem_var}=\"${!mem_var}\"" >> "$_tmp"
+        [ -n "${!comp_var}" ] && echo "${comp_var}=\"${!comp_var}\"" >> "$_tmp"
     done
     chmod 600 "$_tmp" 2>/dev/null || true
     if [ ! -s "$_tmp" ]; then
@@ -8964,6 +9000,218 @@ telegram_setup_wizard() {
     read -n 1 -s -r -p "  Press any key to return..." < /dev/tty || true
 }
 
+# ─── Client Mode (Compartment) ────────────────────────────────────────────────
+
+_check_image_latest() {
+    local latest_id running_id
+    # Image must exist locally
+    latest_id=$(docker image inspect "$CONDUIT_IMAGE" --format='{{.Id}}' 2>/dev/null) || return 1
+    # If a container is running, verify it uses the latest pulled image
+    running_id=$(docker inspect conduit --format='{{.Image}}' 2>/dev/null) || return 0
+    [ "$latest_id" = "$running_id" ]
+}
+
+_compartment_label() {
+    local val="${1:-}"
+    if [ "$val" = "shirokhorshid" ]; then
+        echo -e "${MAGENTA}Shir o Khorshid${NC}"
+    else
+        echo "Standard"
+    fi
+}
+
+show_compartment_menu() {
+    while true; do
+        clear
+        echo ""
+        echo -e "${CYAN}${BOLD}  CONDUIT CLIENT MODE${NC}"
+        echo -e "${CYAN}─────────────────────────────────────────────────────────────────${NC}"
+        echo ""
+        # Show current global mode
+        local _cur_mode="Standard (default Psiphon clients)"
+        [ "${COMPARTMENT:-}" = "shirokhorshid" ] && _cur_mode="${MAGENTA}Shir o Khorshid${NC}"
+        echo -e "  Current mode: ${BOLD}${_cur_mode}${NC}"
+        echo ""
+        # Check for per-container overrides
+        local _has_overrides=false
+        if [ "${CONTAINER_COUNT:-1}" -gt 1 ]; then
+            for i in $(seq 1 "${CONTAINER_COUNT:-1}"); do
+                local _cvar="COMPARTMENT_${i}"
+                if [ -n "${!_cvar}" ]; then
+                    _has_overrides=true
+                    break
+                fi
+            done
+        fi
+        if [ "$_has_overrides" = true ]; then
+            echo -e "  ${YELLOW}Per-container overrides active:${NC}"
+            for i in $(seq 1 "${CONTAINER_COUNT:-1}"); do
+                local _cval=$(get_container_compartment $i)
+                echo -e "    Container $i: $(_compartment_label "$_cval")"
+            done
+            echo ""
+        fi
+        echo -e "${CYAN}─────────────────────────────────────────────────────────────────${NC}"
+        echo ""
+        echo -e "  Shir o Khorshid is an alternative Psiphon client for Iran."
+        echo -e "  Enabling this mode dedicates your node to its users."
+        echo -e "  ${DIM}This requires the latest Conduit image.${NC}"
+        echo ""
+        echo -e "${CYAN}─────────────────────────────────────────────────────────────────${NC}"
+        echo ""
+        echo -e "  1. Standard (default Psiphon clients)"
+        echo -e "  2. Shir o Khorshid (Iranian client)"
+        if [ "${CONTAINER_COUNT:-1}" -gt 1 ]; then
+            echo -e "  3. Per-container setup"
+        fi
+        echo -e "  i. Info — What is Shir o Khorshid?"
+        echo -e "  0. Back"
+        echo ""
+        read -p "  Enter choice: " _comp_choice < /dev/tty || { return; }
+        case "$_comp_choice" in
+            1)
+                if [ "${COMPARTMENT:-}" = "" ] && [ "$_has_overrides" = false ]; then
+                    echo -e "\n  ${DIM}Already using Standard mode.${NC}"
+                    sleep 1
+                    continue
+                fi
+                COMPARTMENT=""
+                # Clear per-container overrides
+                for i in $(seq 1 "${CONTAINER_COUNT:-1}"); do
+                    eval "COMPARTMENT_${i}="
+                done
+                save_settings
+                echo -e "\n  ${GREEN}✓ Switched to Standard mode.${NC}"
+                echo ""
+                read -p "  Recreate containers now to apply? [y/N]: " _rc < /dev/tty || true
+                if [[ "$_rc" =~ ^[Yy]$ ]]; then
+                    recreate_containers
+                else
+                    echo -e "  ${CYAN}Setting saved. Restart containers to apply.${NC}"
+                fi
+                read -n 1 -s -r -p "  Press any key to continue..." < /dev/tty || true
+                ;;
+            2)
+                if [ "${COMPARTMENT:-}" = "shirokhorshid" ] && [ "$_has_overrides" = false ]; then
+                    echo -e "\n  ${DIM}Already using Shir o Khorshid mode.${NC}"
+                    sleep 1
+                    continue
+                fi
+                # Warn if image may be outdated
+                if ! _check_image_latest; then
+                    echo ""
+                    echo -e "  ${YELLOW}Note: Your containers may not be running the latest image.${NC}"
+                    echo -e "  ${YELLOW}Consider running Update (option 8) for best results.${NC}"
+                    echo ""
+                fi
+                COMPARTMENT="shirokhorshid"
+                # Clear per-container overrides
+                for i in $(seq 1 "${CONTAINER_COUNT:-1}"); do
+                    eval "COMPARTMENT_${i}="
+                done
+                save_settings
+                echo -e "\n  ${GREEN}✓ Switched to Shir o Khorshid mode.${NC}"
+                echo ""
+                read -p "  Recreate containers now to apply? [y/N]: " _rc < /dev/tty || true
+                if [[ "$_rc" =~ ^[Yy]$ ]]; then
+                    recreate_containers
+                else
+                    echo -e "  ${CYAN}Setting saved. Restart containers to apply.${NC}"
+                fi
+                read -n 1 -s -r -p "  Press any key to continue..." < /dev/tty || true
+                ;;
+            3)
+                if [ "${CONTAINER_COUNT:-1}" -le 1 ]; then
+                    echo -e "\n  ${RED}Invalid choice.${NC}"
+                    sleep 1
+                    continue
+                fi
+                # Warn if image may be outdated
+                if ! _check_image_latest; then
+                    echo ""
+                    echo -e "  ${YELLOW}Note: Your containers may not be running the latest image.${NC}"
+                    echo -e "  ${YELLOW}Consider running Update (option 8) for best results.${NC}"
+                fi
+                echo ""
+                echo -e "  ${BOLD}Per-container client mode:${NC}"
+                for i in $(seq 1 "${CONTAINER_COUNT:-1}"); do
+                    local _cval=$(get_container_compartment $i)
+                    echo -e "    $i. Container $i: $(_compartment_label "$_cval")"
+                done
+                echo -e "    0. Back"
+                echo ""
+                read -p "  Select container: " _cidx < /dev/tty || { continue; }
+                if [ "$_cidx" = "0" ]; then continue; fi
+                if ! [[ "$_cidx" =~ ^[0-9]+$ ]] || [ "$_cidx" -lt 1 ] || [ "$_cidx" -gt "${CONTAINER_COUNT:-1}" ]; then
+                    echo -e "  ${RED}Invalid container number.${NC}"
+                    sleep 1
+                    continue
+                fi
+                echo ""
+                echo -e "  Set mode for container $_cidx:"
+                echo -e "    1. Standard"
+                echo -e "    2. Shir o Khorshid"
+                read -p "  Choice: " _cmode < /dev/tty || { continue; }
+                case "$_cmode" in
+                    1) eval "COMPARTMENT_${_cidx}=none" ;;
+                    2) eval "COMPARTMENT_${_cidx}=shirokhorshid" ;;
+                    *) echo -e "  ${RED}Invalid choice.${NC}"; sleep 1; continue ;;
+                esac
+                save_settings
+                echo -e "\n  ${GREEN}✓ Container $_cidx updated.${NC}"
+                echo ""
+                read -p "  Recreate container $_cidx now to apply? [y/N]: " _rc < /dev/tty || true
+                if [[ "$_rc" =~ ^[Yy]$ ]]; then
+                    local _cname=$(get_container_name $_cidx)
+                    docker rm -f "$_cname" 2>/dev/null || true
+                    run_conduit_container $_cidx
+                    if docker ps 2>/dev/null | grep -q "[[:space:]]${_cname}$"; then
+                        echo -e "  ${GREEN}✓ Container $_cidx recreated.${NC}"
+                    else
+                        echo -e "  ${RED}✗ Container $_cidx failed to start.${NC}"
+                    fi
+                else
+                    echo -e "  ${CYAN}Setting saved. Restart container to apply.${NC}"
+                fi
+                read -n 1 -s -r -p "  Press any key to continue..." < /dev/tty || true
+                ;;
+            i|I)
+                clear
+                echo ""
+                echo -e "${CYAN}${BOLD}  ABOUT SHIR O KHORSHID${NC}"
+                echo -e "${CYAN}─────────────────────────────────────────────────────────────────${NC}"
+                echo ""
+                echo -e "  ${BOLD}Shir o Khorshid${NC} is an alternative Psiphon client built"
+                echo -e "  specifically for users in Iran. It connects through the same"
+                echo -e "  Conduit network but uses a dedicated compartment so that"
+                echo -e "  volunteer nodes can choose to serve its users directly."
+                echo ""
+                echo -e "  ${BOLD}How it works:${NC}"
+                echo -e "  When you enable Shir o Khorshid mode, your Conduit container"
+                echo -e "  starts with ${CYAN}--compartment shirokhorshid${NC}, which tells the"
+                echo -e "  broker to route Shir o Khorshid client traffic to your node"
+                echo -e "  instead of general Psiphon client traffic."
+                echo ""
+                echo -e "  ${BOLD}The client app:${NC}"
+                echo -e "  Currently available for Android as a direct APK download."
+                echo -e "  A Play Store release is coming soon."
+                echo ""
+                echo -e "  ${CYAN}Download:${NC}"
+                echo -e "  ${DIM}https://github.com/shirokhorshid/shirokhorshid-android/releases${NC}"
+                echo ""
+                echo -e "  ${BOLD}Developed by:${NC}"
+                echo -e "  ${DIM}https://x.com/PawnToPromotion${NC}"
+                echo ""
+                echo -e "${CYAN}─────────────────────────────────────────────────────────────────${NC}"
+                echo ""
+                read -n 1 -s -r -p "  Press any key to go back..." < /dev/tty || true
+                ;;
+            0) return ;;
+            *) echo -e "  ${RED}Invalid choice.${NC}"; sleep 1 ;;
+        esac
+    done
+}
+
 show_menu() {
     # Fix outdated systemd service files
     if command -v systemctl &>/dev/null; then
@@ -9122,6 +9370,22 @@ SVCEOF
                 echo -e "  p. ✉️  Telegram MTProto Proxy"
             fi
             echo ""
+            # Client mode menu item
+            local _comp_label="Standard"
+            if [ "${COMPARTMENT:-}" = "shirokhorshid" ]; then
+                _comp_label="${MAGENTA}Shir o Khorshid${NC}"
+            fi
+            # Check for mixed per-container overrides
+            if [ "${CONTAINER_COUNT:-1}" -gt 1 ]; then
+                local _has_comp_override=false
+                for _ci in $(seq 1 "${CONTAINER_COUNT:-1}"); do
+                    local _cv="COMPARTMENT_${_ci}"
+                    [ -n "${!_cv}" ] && { _has_comp_override=true; break; }
+                done
+                [ "$_has_comp_override" = true ] && _comp_label="${YELLOW}Mixed${NC}"
+            fi
+            echo -e "  ${CYAN}s${NC}. 🦁 Conduit Client Mode [${_comp_label}]"
+            echo ""
             echo -e "  ${CYAN}n${NC}. 📡 Psiphon Network Stats"
             echo -e "  ${CYAN}e${NC}. 📈 Iran Connectivity Status"
             echo -e "  ${CYAN}t${NC}. 🔗 Iran Connectivity Test"
@@ -9194,6 +9458,10 @@ SVCEOF
                 ;;
             p|P)
                 show_mtproto_menu
+                redraw=true
+                ;;
+            s|S)
+                show_compartment_menu
                 redraw=true
                 ;;
             i)
@@ -10250,6 +10518,7 @@ _info_cli_commands() {
         echo -e "  ${GREEN}network-stats${NC}     Psiphon global network statistics"
         echo -e "  ${GREEN}iran-status${NC}       Iran connectivity (IODA, OONI, RIPE)"
         echo -e "  ${GREEN}iran-test${NC}         Iran connectivity test (ping, MTU, trace)"
+        echo -e "  ${GREEN}client-mode${NC}       Switch client mode (Standard/Shir o Khorshid)"
         echo ""
         echo -e "  Press ${BOLD}any key${NC} for page 2..."
         read -n 1 -s -r < /dev/tty || true
@@ -14208,6 +14477,7 @@ show_help() {
     echo "  network-stats Show Psiphon network statistics"
     echo "  iran-status   Iran connectivity status (IODA, OONI)"
     echo "  iran-test     Iran connectivity test (ping, traceroute, MTR)"
+    echo "  client-mode   Switch Conduit client mode (Standard/Shir o Khorshid)"
     echo "  uninstall    Remove everything (container, data, service)"
     echo "  menu         Open interactive menu (default)"
     echo "  version      Show version information"
@@ -14829,6 +15099,7 @@ case "${1:-menu}" in
     network-stats) show_psiphon_stats ;;
     iran-status)   show_iran_connectivity ;;
     iran-test)     show_iran_test ;;
+    client-mode)   show_compartment_menu ;;
     add-server|deploy) add_server_interactive ;;
     edit-server)   edit_server_interactive ;;
     remove-server) remove_server_interactive ;;
@@ -15238,7 +15509,7 @@ SVCEOF
     fi
 }
 #
-# REACHED END OF SCRIPT - VERSION 1.3.3
+# REACHED END OF SCRIPT - VERSION 1.3.4
 # ###############################################################################
 main "$@"
 
