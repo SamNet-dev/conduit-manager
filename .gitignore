@@ -1,0 +1,26 @@
+# GitHub workflows and PR templates (kept locally for reference)
+.github/
+
+# Cursor IDE files
+.cursor/
+
+# Editor files
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Backup files
+*.bak
+*.backup
+
+# Temporary files
+*.tmp
+*.temp
+
+# Log files
+*.log
+
+# Local development files
+.env
+.env.local
