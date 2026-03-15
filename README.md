@@ -625,3 +625,9 @@ Pull requests welcome. For major changes, open an issue first.
 
 - [Psiphon](https://psiphon.ca/)
 - [Psiphon Conduit](https://github.com/Psiphon-Inc/conduit)
+
+## 💖 Support
+
+If this project helps you, consider supporting continued development:
+
+**[samnet.dev/donate](https://www.samnet.dev/donate/)**
