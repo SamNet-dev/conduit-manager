@@ -23,7 +23,10 @@
 #   -v, --verbose           increase verbosity (-v for verbose, -vv for debug)
 #
 
-set -eo pipefail
+# -e (errexit) is intentionally omitted: the script uses || true guards on
+# non-critical commands throughout. Critical operations (docker pull, docker
+# run, service setup) are checked explicitly with `if !` / exit-code tests.
+set -o pipefail
 
 # Require bash
 if [ -z "$BASH_VERSION" ]; then
@@ -52,6 +55,37 @@ NC='\033[0m'
 #═══════════════════════════════════════════════════════════════════════
 # Utility Functions
 #═══════════════════════════════════════════════════════════════════════
+
+# Safe settings loader — parses KEY=VALUE pairs without executing the file.
+# Avoids the code-injection risk of `source settings.conf` running as root.
+# Only assigns variables whose names match ^[A-Z_][A-Z0-9_]*$ (uppercase
+# identifiers only), stripping surrounding single/double quotes from values.
+# NOTE: This function is intentionally duplicated in the management-script
+# heredoc below so that both the installer and the installed CLI share the
+# same safe approach without a runtime dependency on each other.
+load_settings() {
+    local conf="${1:-$INSTALL_DIR/settings.conf}"
+    [ -f "$conf" ] || return 0
+    local _key _val _line
+    while IFS= read -r _line || [ -n "$_line" ]; do
+        # Skip blank lines and comments
+        case "$_line" in
+            ''|\#*) continue ;;
+        esac
+        IFS='=' read -r _key _val <<< "$_line"
+        # Require a strict uppercase identifier — reject anything else
+        case "$_key" in
+            *[!A-Z0-9_]*|'') continue ;;
+        esac
+        case "$_key" in [0-9]*) continue ;; esac  # must not start with digit
+        # Strip leading/trailing whitespace and surrounding quotes
+        _val="${_val#"${_val%%[! ]*}"}"
+        _val="${_val%"${_val##*[! ]}"}"
+        _val="${_val#\"}" ; _val="${_val%\"}"
+        _val="${_val#\'}" ; _val="${_val%\'}"
+        printf -v "$_key" '%s' "$_val"
+    done < "$conf"
+}
 
 print_header() {
     echo -e "${CYAN}"
@@ -602,8 +636,8 @@ install_docker() {
         fi
     fi
     
-    sleep 3
-    local retries=27
+    # Wait for Docker daemon with retry loop — no unconditional sleep needed.
+    local retries=30
     while ! docker info &>/dev/null && [ $retries -gt 0 ]; do
         sleep 1
         retries=$((retries - 1))
@@ -741,7 +775,14 @@ run_conduit() {
         fi
     done
 
-    sleep 3
+    # Wait for at least one conduit container to appear in `docker ps`.
+    # Uses the same retry pattern as the Docker-daemon readiness check above.
+    local _c_retries=15
+    while [ -z "$(docker ps -q --filter name=conduit 2>/dev/null)" ] && [ $_c_retries -gt 0 ]; do
+        sleep 1
+        _c_retries=$((_c_retries - 1))
+    done
+
     if [ -n "$(docker ps -q --filter name=conduit 2>/dev/null)" ]; then
         if [ "$BANDWIDTH" == "-1" ]; then
             log_success "Settings: max-clients=$MAX_CLIENTS, bandwidth=Unlimited, containers=$count"
@@ -766,7 +807,7 @@ save_settings_install() {
     local _dc_base_rx="0" _dc_base_tx="0" _dc_prior="0" _dc_prior_rx="0" _dc_prior_tx="0"
     local _dk_cpus="" _dk_memory="" _tracker="true"
     if [ -f "$INSTALL_DIR/settings.conf" ]; then
-        source "$INSTALL_DIR/settings.conf" 2>/dev/null || true
+        load_settings
         _tg_token="${TELEGRAM_BOT_TOKEN:-}"
         _tg_chat="${TELEGRAM_CHAT_ID:-}"
         _tg_interval="${TELEGRAM_INTERVAL:-6}"
@@ -963,9 +1004,12 @@ create_management_script() {
 VERSION="1.3.4"
 INSTALL_DIR="REPLACE_ME_INSTALL_DIR"
 BACKUP_DIR="$INSTALL_DIR/backups"
-CONDUIT_IMAGE="ghcr.io/ssmirr/conduit/conduit:latest"
+CONDUIT_IMAGE="REPLACE_ME_CONDUIT_IMAGE"
 
-# Colors
+# Colors — intentionally duplicated from the outer installer.
+# The management script is a self-contained executable written to disk; it
+# cannot source helpers from the installer at runtime, so shared definitions
+# (colours, load_settings, get_cpu_cores) are reproduced here by design.
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -976,10 +1020,35 @@ BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m'
 
+# Safe settings loader — parses KEY=VALUE pairs without executing the file.
+# Avoids the code-injection risk of `source settings.conf` running as root.
+# NOTE: Intentionally duplicated here and in the outer installer so that
+# both scripts are self-contained and share the same safe parsing approach.
+load_settings() {
+    local conf="${1:-$INSTALL_DIR/settings.conf}"
+    [ -f "$conf" ] || return 0
+    local _key _val _line
+    while IFS= read -r _line || [ -n "$_line" ]; do
+        case "$_line" in
+            ''|\#*) continue ;;
+        esac
+        IFS='=' read -r _key _val <<< "$_line"
+        case "$_key" in
+            *[!A-Z0-9_]*|'') continue ;;
+        esac
+        case "$_key" in [0-9]*) continue ;; esac
+        _val="${_val#"${_val%%[! ]*}"}"
+        _val="${_val%"${_val##*[! ]}"}"
+        _val="${_val#\"}" ; _val="${_val%\"}"
+        _val="${_val#\'}" ; _val="${_val%\'}"
+        printf -v "$_key" '%s' "$_val"
+    done < "$conf"
+}
+
 # Load settings (enforce permissions on sensitive config files)
 if [ -f "$INSTALL_DIR/settings.conf" ]; then
     chmod 600 "$INSTALL_DIR/settings.conf" 2>/dev/null || true
-    source "$INSTALL_DIR/settings.conf"
+    load_settings
 fi
 MAX_CLIENTS=${MAX_CLIENTS:-200}
 BANDWIDTH=${BANDWIDTH:-5}
@@ -2508,7 +2577,7 @@ get_system_stats() {
 
     # 1. System CPU (Stateful Average)
     local sys_cpu="0%"
-    local cpu_tmp="/tmp/conduit_cpu_state"
+    local cpu_tmp="$INSTALL_DIR/.cpu_state"
 
     if [ -f /proc/stat ]; then
         read -r cpu user nice system idle iowait irq softirq steal guest < /proc/stat
@@ -2711,7 +2780,7 @@ PERSIST_DIR="/opt/conduit/traffic_stats"
 mkdir -p "$PERSIST_DIR"
 
 # Load settings (CONTAINER_COUNT, MAX_CLIENTS, etc.)
-[ -f "$INSTALL_DIR/settings.conf" ] && source "$INSTALL_DIR/settings.conf"
+load_settings
 CONTAINER_COUNT=${CONTAINER_COUNT:-1}
 
 STATS_FILE="$PERSIST_DIR/cumulative_data"
@@ -3654,7 +3723,7 @@ show_peers() {
     done
     echo -ne "\033[?25h"
     tput rmcup 2>/dev/null || true
-    rm -f /tmp/conduit_peers_sorted
+    
     trap - SIGINT SIGTERM SIGHUP SIGQUIT
 }
 
@@ -4345,6 +4414,7 @@ show_status() {
     local total_connecting=0
     local total_connected=0
     local uptime=""
+    local _stats_parsed=false  # set to true if any container returns parseable [STATS]
 
     # Fetch all container logs in parallel
     local _st_tmpdir=$(mktemp -d /tmp/.conduit_st.XXXXXX)
@@ -4384,6 +4454,8 @@ show_status() {
                 _c_cing[$i]="${c_connecting:-0}"
                 _c_up[$i]="${c_up_val}"
                 _c_down[$i]="${c_down_val}"
+                # Track that at least one container produced parseable stats
+                [ -n "${c_up_val}${c_down_val}${c_connected}" ] && _stats_parsed=true
                 # Update global cache with fresh data
                 _STATS_CACHE_UP[$i]="${c_up_val}"
                 _STATS_CACHE_DOWN[$i]="${c_down_val}"
@@ -4562,6 +4634,10 @@ show_status() {
             printf "  Upload:   ${CYAN}%-12s${NC} ${DIM}|${NC} Clients: ${DIM}6h:${NC}${GREEN}%-4s${NC} ${DIM}12h:${NC}${GREEN}%-4s${NC} ${DIM}24h:${NC}${GREEN}%s${NC}${EL}\n" \
                 "${upload:-0 B}" "${conn_6h}" "${conn_12h}" "${conn_24h}"
             printf "  Download: ${CYAN}%-12s${NC} ${DIM}|${NC}${EL}\n" "${download:-0 B}"
+            # Warn if running containers produced no parseable [STATS] lines
+            if [ "$_stats_parsed" = false ] && [ "$running_count" -gt 0 ]; then
+                echo -e "  ${YELLOW}⚠ Stats format unrecognised — check: conduit logs${NC}${EL}"
+            fi
 
             echo -e "${EL}"
             echo -e "${CYAN}═══ Resource Usage ═══${NC}${EL}"
@@ -6647,7 +6723,7 @@ telegram_generate_notify_script() {
 
 INSTALL_DIR="/opt/conduit"
 
-[ -f "$INSTALL_DIR/settings.conf" ] && source "$INSTALL_DIR/settings.conf"
+load_settings
 
 # Exit if not configured
 [ "$TELEGRAM_ENABLED" != "true" ] && exit 0
@@ -7022,7 +7098,7 @@ check_alerts() {
         read -r _c user nice system idle iowait irq softirq steal guest < /proc/stat
         local total_curr=$((user + nice + system + idle + iowait + irq + softirq + steal))
         local work_curr=$((user + nice + system + irq + softirq + steal))
-        local cpu_state="/tmp/conduit_cpu_alert_state"
+        local cpu_state="$INSTALL_DIR/.cpu_alert_state"
         local cpu_val=0
         if [ -f "$cpu_state" ]; then
             local total_prev work_prev
@@ -7457,7 +7533,7 @@ except Exception:
                     if [ "$cb_data" = "up_${_cb_label}" ]; then
                         telegram_answer_callback "$cb_id" "Updating..."
                         telegram_send "🔄 Checking for updates..."
-                        local conduit_img="ghcr.io/ssmirr/conduit/conduit:latest"
+                        local conduit_img="$CONDUIT_IMAGE"
                         local pull_out
                         pull_out=$(docker pull "$conduit_img" 2>&1)
                         if [ $? -ne 0 ]; then
@@ -8081,7 +8157,7 @@ build_report() {
         read -r _c user nice system idle iowait irq softirq steal guest < /proc/stat
         local total_curr=$((user + nice + system + idle + iowait + irq + softirq + steal))
         local work_curr=$((user + nice + system + irq + softirq + steal))
-        local cpu_tmp="/tmp/conduit_cpu_state"
+        local cpu_tmp="$INSTALL_DIR/.cpu_state"
         if [ -f "$cpu_tmp" ]; then
             local total_prev work_prev
             read -r total_prev work_prev < "$cpu_tmp"
@@ -8318,7 +8394,7 @@ last_periodic=$(date +%s)
 
 while true; do
     # Re-read settings
-    [ -f "$INSTALL_DIR/settings.conf" ] && source "$INSTALL_DIR/settings.conf"
+    load_settings
 
     # Exit if disabled
     [ "$TELEGRAM_ENABLED" != "true" ] && exit 0
@@ -8684,7 +8760,7 @@ show_settings_menu() {
 show_telegram_menu() {
     while true; do
         # Reload settings from disk to reflect any changes
-        [ -f "$INSTALL_DIR/settings.conf" ] && source "$INSTALL_DIR/settings.conf"
+        load_settings
         clear
         print_header
         if [ "$TELEGRAM_ENABLED" = "true" ] && [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
@@ -9287,7 +9363,7 @@ SVCEOF
         fi
     fi
 
-    [ -f "$INSTALL_DIR/settings.conf" ] && source "$INSTALL_DIR/settings.conf"
+    load_settings
 
     if command -v systemctl &>/dev/null && systemctl is-active conduit-telegram.service &>/dev/null; then
         telegram_generate_notify_script
@@ -15155,8 +15231,9 @@ case "${1:-menu}" in
 esac
 MANAGEMENT
 
-    # Patch the INSTALL_DIR in the generated script
+    # Patch placeholders in the generated script
     sed -i "s#REPLACE_ME_INSTALL_DIR#$INSTALL_DIR#g" "$tmp_script"
+    sed -i "s#REPLACE_ME_CONDUIT_IMAGE#$CONDUIT_IMAGE#g" "$tmp_script"
 
     chmod +x "$tmp_script"
     if ! mv -f "$tmp_script" "$INSTALL_DIR/conduit"; then
@@ -15362,7 +15439,7 @@ main() {
         --update-components)
             # Called by menu update to regenerate scripts without touching containers
             INSTALL_DIR="/opt/conduit"
-            [ -f "$INSTALL_DIR/settings.conf" ] && source "$INSTALL_DIR/settings.conf"
+            load_settings
             if ! create_management_script; then
                 echo -e "${RED}Failed to update management script${NC}"
                 exit 1
@@ -15437,7 +15514,7 @@ SVCEOF
                 create_management_script
                 # Regenerate Telegram script if enabled (picks up new features)
                 if [ -f "$INSTALL_DIR/settings.conf" ]; then
-                    source "$INSTALL_DIR/settings.conf"
+                    load_settings
                     if [ "$TELEGRAM_ENABLED" = "true" ]; then
                         telegram_generate_notify_script 2>/dev/null || true
                         systemctl restart conduit-telegram 2>/dev/null || true
@@ -15460,8 +15537,7 @@ SVCEOF
                 ;;
             *)
                 echo -e "${RED}Invalid choice: ${NC}${YELLOW}$choice${NC}"
-                echo -e "${CYAN}Returning to installer...${NC}"
-                sleep 1
+                # Loop continues — no sleep needed, the while condition re-prompts
                 ;;
         esac
     done
