@@ -1,0 +1,7 @@
+# Runtime files — generated at startup, should not be committed
+.dashboard.pid
+.dashboard.log
+dashboard.log
+
+# Local working/backup copies
+working version/

@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KhajuBridge Conduit Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #020608;
+    --bg2:       #060e10;
+    --surface:   #071014;
+    --surface2:  #0c1a1e;
+    --surface3:  #112228;
+    --border:    #0d3040;
+    --border2:   #1a5060;
+    --text:      #b0d8e0;
+    --dim:       #3a6070;
+    --dim2:      #4a7888;
+    --cyan:      #00e5ff;
+    --cyan2:     #00b4cc;
+    --green:     #00ff88;
+    --green2:    #00cc6a;
+    --red:       #ff3860;
+    --yellow:    #ffdd00;
+    --orange:    #ff8c00;
+    --magenta:   #e040fb;
+    --glow-c:    rgba(0,229,255,0.15);
+    --glow-g:    rgba(0,255,136,0.15);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Rajdhani', 'Segoe UI', sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Scanline overlay ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.07) 2px,
+      rgba(0,0,0,0.07) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* ── Grid bg ── */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Header ── */
+  header {
+    background: linear-gradient(180deg, #041016 0%, var(--surface) 100%);
+    border-bottom: 2px solid var(--cyan2);
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 40px rgba(0,229,255,0.12), 0 0 80px rgba(0,229,255,0.04);
+  }
+
+  .logo-wrap {
+    flex-shrink: 0;
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    border: 2px solid var(--cyan);
+    box-shadow: 0 0 14px rgba(0,229,255,0.6), 0 0 30px rgba(0,229,255,0.2);
+    overflow: hidden;
+    background: #000;
+  }
+  .logo-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+  }
+
+  .header-titles {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .header-titles h1 {
+    font-family: 'Orbitron', monospace;
+    font-size: 19px;
+    font-weight: 900;
+    color: var(--cyan);
+    text-shadow: 0 0 12px rgba(0,229,255,0.7), 0 0 30px rgba(0,229,255,0.3);
+    letter-spacing: 0.06em;
+    line-height: 1.1;
+    text-transform: uppercase;
+  }
+  .subtitle-1 {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--green);
+    text-shadow: 0 0 8px rgba(0,255,136,0.5);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .subtitle-2 {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--dim2);
+    letter-spacing: 0.08em;
+  }
+
+  .status-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 4px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid;
+    letter-spacing: .08em;
+  }
+  .status-badge.running {
+    color: var(--green);
+    border-color: var(--green2);
+    background: rgba(0,255,136,0.06);
+    box-shadow: 0 0 10px rgba(0,255,136,0.15), inset 0 0 6px rgba(0,255,136,0.05);
+  }
+  .status-badge.stopped {
+    color: var(--red);
+    border-color: var(--red);
+    background: rgba(255,56,96,0.06);
+  }
+  .pulse { width: 8px; height: 8px; border-radius: 50%; }
+  .pulse.green { background: var(--green); animation: pulse-g 2s infinite; }
+  .pulse.red   { background: var(--red); }
+  @keyframes pulse-g {
+    0%,100% { box-shadow: 0 0 0 0 rgba(0,255,136,.6); }
+    50%      { box-shadow: 0 0 0 6px rgba(0,255,136,0); }
+  }
+
+  .header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+  .refresh-info {
+    color: var(--dim2);
+    font-size: 11px;
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  .btn {
+    padding: 6px 14px;
+    border-radius: 3px;
+    border: 1px solid var(--border2);
+    background: var(--surface2);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: 'Rajdhani', sans-serif;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    transition: all .15s;
+  }
+  .btn:hover {
+    border-color: var(--cyan);
+    color: var(--cyan);
+    box-shadow: 0 0 10px rgba(0,229,255,0.2);
+    background: rgba(0,229,255,0.05);
+  }
+  .btn.primary { border-color: var(--cyan2); color: var(--cyan); }
+  .btn.danger  { border-color: var(--red); color: var(--red); }
+  .btn:disabled { opacity: .35; cursor: default; }
+
+  /* ── Layout ── */
+  main {
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    max-width: 1600px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width:1200px) { .grid-4 { grid-template-columns: repeat(2,1fr); } }
+  @media (max-width:900px)  { .grid-4,.grid-2 { grid-template-columns: 1fr; } }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    padding: 16px;
+    position: relative;
+    box-shadow: inset 0 1px 0 rgba(0,229,255,0.05);
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--cyan2), transparent);
+    opacity: 0.4;
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .card-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    color: var(--cyan2);
+    text-shadow: 0 0 8px rgba(0,180,204,0.4);
+  }
+  .card-age {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--dim2);
+  }
+
+  /* ── Stat items ── */
+  .stat-row   { display: flex; flex-direction: column; gap: 7px; }
+  .stat-item  { display: flex; justify-content: space-between; align-items: center; }
+  .stat-label {
+    font-family: 'Rajdhani', sans-serif;
+    color: var(--dim2);
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .stat-val {
+    font-family: 'Share Tech Mono', monospace;
+    font-weight: 600;
+    font-size: 12px;
+  }
+
+  /* ── Color utils ── */
+  .green  { color: var(--green); }
+  .red    { color: var(--red); }
+  .yellow { color: var(--yellow); }
+  .cyan   { color: var(--cyan); }
+  .orange { color: var(--orange); }
+  .dim    { color: var(--dim2); }
+  .magenta{ color: var(--magenta); }
+
+  /* ── Badges ── */
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 2px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    border: 1px solid;
+  }
+  .badge-green  { color: var(--green);   border-color: var(--green2);  background: rgba(0,255,136,0.08); }
+  .badge-red    { color: var(--red);     border-color: var(--red);     background: rgba(255,56,96,0.08); }
+  .badge-yellow { color: var(--yellow);  border-color: #aa9200;        background: rgba(255,221,0,0.08); }
+  .badge-cyan   { color: var(--cyan);    border-color: var(--cyan2);   background: rgba(0,229,255,0.08); }
+  .badge-dim    { color: var(--dim2);    border-color: var(--border2); background: var(--surface2); }
+
+  /* ── Tables ── */
+  .data-table { width: 100%; border-collapse: collapse; }
+  .data-table th {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--dim2);
+    padding: 5px 8px;
+    text-align: left;
+    border-bottom: 1px solid var(--border2);
+  }
+  .data-table td {
+    font-family: 'Share Tech Mono', monospace;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--text);
+  }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: rgba(0,229,255,0.04); }
+  .iran-row td {
+    background: rgba(255,140,0,0.06);
+    color: var(--orange);
+    font-weight: 700;
+    text-shadow: 0 0 6px rgba(255,140,0,0.3);
+  }
+  .iran-row:hover td { background: rgba(255,140,0,0.1) !important; }
+
+  /* ── Health grid ── */
+  .health-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: 6px; }
+  .health-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-size: 11px;
+  }
+  .health-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .health-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-weight: 700;
+    flex: 1;
+    font-size: 10px;
+    color: var(--text);
+  }
+  .health-detail {
+    font-family: 'Rajdhani', sans-serif;
+    color: var(--dim2);
+    font-size: 11px;
+  }
+  .health-container-header {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    color: var(--cyan2);
+    margin: 10px 0 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  .health-container-header:first-child { margin-top: 0; }
+
+  /* ── Log viewer ── */
+  .log-box {
+    background: #010508;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 12px;
+    height: 280px;
+    overflow-y: auto;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    line-height: 1.7;
+    color: #4a8a70;
+  }
+  .log-box .log-line:hover { background: rgba(0,229,255,0.03); color: var(--green); }
+
+  /* ── Raw output ── */
+  .raw-box {
+    background: #010508;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 12px;
+    max-height: 400px;
+    overflow-y: auto;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    line-height: 1.7;
+    color: #4a8a70;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+  /* ── BGP gauge ── */
+  .bgp-gauge { display: flex; align-items: center; gap: 14px; margin-top: 8px; }
+  .gauge-bar {
+    flex: 1;
+    height: 6px;
+    background: var(--surface2);
+    border-radius: 3px;
+    overflow: hidden;
+    border: 1px solid var(--border2);
+  }
+  .gauge-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width .6s ease;
+    box-shadow: 0 0 8px currentColor;
+  }
+  .gauge-pct {
+    font-family: 'Orbitron', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    min-width: 56px;
+  }
+
+  /* ── Section labels ── */
+  .section-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    color: var(--cyan2);
+    margin-bottom: 8px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid var(--border2);
+  }
+
+  /* ── Container cards ── */
+  .container-card {
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 3px;
+    padding: 12px;
+  }
+  .container-name {
+    font-family: 'Orbitron', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--cyan);
+    text-shadow: 0 0 8px rgba(0,229,255,0.4);
+    margin-bottom: 10px;
+    letter-spacing: .06em;
+  }
+
+  /* ── Iran card ── */
+  .iran-highlight {
+    border-color: rgba(255,140,0,0.3);
+    background: linear-gradient(180deg, rgba(255,100,0,0.03) 0%, var(--surface) 100%);
+  }
+  .iran-highlight::before {
+    background: linear-gradient(90deg, transparent, var(--orange), transparent);
+    opacity: 0.3;
+  }
+  .iran-title { color: var(--orange) !important; text-shadow: 0 0 8px rgba(255,140,0,0.4) !important; }
+
+  /* ── Controls ── */
+  .controls-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .output-area { margin-top: 14px; }
+
+  /* ── Loader / errors ── */
+  .loading {
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--dim2);
+    font-style: italic;
+    padding: 20px 0;
+    text-align: center;
+    font-size: 11px;
+  }
+  .error-text {
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--red);
+    font-size: 11px;
+  }
+
+  /* ── Spinner ── */
+  .spinner {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border: 2px solid var(--border2);
+    border-top-color: var(--cyan);
+    border-radius: 50%;
+    animation: spin .6s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--cyan2); }
+
+  /* ── Corner accent ── */
+  .corner-accent {
+    position: absolute;
+    bottom: 0; right: 0;
+    width: 12px; height: 12px;
+    border-right: 2px solid var(--cyan2);
+    border-bottom: 2px solid var(--cyan2);
+    opacity: 0.5;
+  }
+  .corner-accent-tl {
+    position: absolute;
+    top: 0; left: 0;
+    width: 12px; height: 12px;
+    border-left: 2px solid var(--cyan2);
+    border-top: 2px solid var(--cyan2);
+    opacity: 0.5;
+  }
+
+  /* ── details/summary ── */
+  details summary {
+    cursor: pointer;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--dim2);
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+  details summary:hover { color: var(--cyan); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-wrap">
+    <img src="/logo.jpg" alt="KhajuBridge Logo">
+  </div>
+  <div class="header-titles">
+    <h1>KhajuBridge Conduit Dashboard</h1>
+    <div class="subtitle-1">Javid Shah</div>
+    <div class="subtitle-2">— created by Carlos — &nbsp;·&nbsp; built on <a href="https://github.com/SamNet-dev/conduit-manager" target="_blank" style="color:var(--cyan2);text-decoration:none;">conduit-manager</a> by SamNet-dev</div>
+  </div>
+  <div id="globalBadge" class="status-badge">
+    <div class="pulse" id="pulseDot"></div>
+    <span id="statusText">INITIALIZING…</span>
+  </div>
+  <div class="header-right">
+    <span class="refresh-info" id="refreshInfo">–</span>
+    <button class="btn primary" onclick="refreshAll()">↺ REFRESH ALL</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- Conduit Power Toggle -->
+  <div class="card" style="padding:10px 18px;">
+    <div class="corner-accent-tl"></div>
+    <div class="corner-accent"></div>
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+      <span class="card-title">CONDUIT POWER</span>
+      <button class="btn primary" id="toggleBtn" onclick="toggleConduit()" style="font-size:13px;padding:7px 22px;font-weight:700;">⏻ LOADING…</button>
+      <span id="toggleStatus" style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--dim2)">checking state…</span>
+    </div>
+  </div>
+
+  <!-- Tehran Info Bar -->
+  <div class="card" id="tehranCard" style="padding:10px 18px;">
+    <div class="corner-accent-tl"></div>
+    <div class="corner-accent"></div>
+    <div style="display:flex;align-items:center;gap:28px;flex-wrap:wrap;">
+      <div>
+        <div class="card-title" style="margin-bottom:4px">🇮🇷 TEHRAN — IRAN</div>
+        <div id="tehranTime" style="font-family:'Orbitron',monospace;font-size:20px;font-weight:700;color:var(--cyan);text-shadow:0 0 12px rgba(0,229,255,0.55);letter-spacing:.06em">--:--:--</div>
+        <div id="tehranDate" style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--dim2);margin-top:3px;letter-spacing:.08em">…</div>
+      </div>
+      <div style="width:1px;height:40px;background:var(--border2);flex-shrink:0"></div>
+      <div id="tehranWeather">
+        <div class="loading" style="padding:0;font-size:11px">loading weather…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 1: Quick Stats -->
+  <div class="grid-4" id="statsRow">
+    <div class="card" id="nodeCard">
+      <div class="corner-accent-tl"></div>
+      <div class="corner-accent"></div>
+      <div class="card-header"><span class="card-title">NODE STATUS</span><span class="card-age" id="nodeAge"></span></div>
+      <div class="loading">scanning…</div>
+    </div>
+    <div class="card" id="sysCard">
+      <div class="corner-accent-tl"></div>
+      <div class="corner-accent"></div>
+      <div class="card-header"><span class="card-title">SYSTEM RESOURCES</span></div>
+      <div class="loading">scanning…</div>
+    </div>
+    <div class="card" id="trafficCard">
+      <div class="corner-accent-tl"></div>
+      <div class="corner-accent"></div>
+      <div class="card-header"><span class="card-title">TRAFFIC STATS</span></div>
+      <div class="loading">scanning…</div>
+    </div>
+    <div class="card" id="settingsCard">
+      <div class="corner-accent-tl"></div>
+      <div class="corner-accent"></div>
+      <div class="card-header"><span class="card-title">SETTINGS</span></div>
+      <div class="loading">scanning…</div>
+    </div>
+  </div>
+
+  <!-- Row 2: Containers -->
+  <div class="card">
+    <div class="corner-accent-tl"></div>
+    <div class="corner-accent"></div>
+    <div class="card-header"><span class="card-title">DOCKER CONTAINERS</span><span class="card-age" id="containersAge"></span></div>
+    <div id="containersBody"><div class="loading">scanning…</div></div>
+  </div>
+
+  <!-- Row 3: Peers -->
+  <div class="grid-2">
+    <div class="card">
+      <div class="corner-accent-tl"></div>
+      <div class="corner-accent"></div>
+      <div class="card-header">
+        <span class="card-title">// INBOUND PEERS — TRAFFIC FROM</span>
+        <span class="card-age" id="peersAge"></span>
+      </div>
+      <div id="inboundBody"><div class="loading">scanning…</div></div>
+    </div>
+    <div class="card">
+      <div class="corner-accent-tl"></div>
+      <div class="corner-accent"></div>
+      <div class="card-header">
+        <span class="card-title">// OUTBOUND PEERS — TRAFFIC TO</span>
+      </div>
+      <div id="outboundBody"><div class="loading">scanning…</div></div>
+    </div>
+  </div>
+
+  <!-- Row 4: Iran -->
+  <div class="grid-2">
+    <div class="card iran-highlight">
+      <div class="corner-accent-tl"></div>
+      <div class="corner-accent"></div>
+      <div class="card-header">
+        <span class="card-title iran-title">🇮🇷 IRAN PEER ACTIVITY — LIVE</span>
+      </div>
+      <div id="iranPeersBody"><div class="loading">scanning…</div></div>
+    </div>
+    <div class="card iran-highlight">
+      <div class="corner-accent-tl"></div>
+      <div class="corner-accent"></div>
+      <div class="card-header">
+        <span class="card-title iran-title">🇮🇷 IRAN INTERNET STATUS — BGP/IODA</span>
+        <span class="card-age" id="iranStatusAge"></span>
+      </div>
+      <div id="iranStatusBody"><div class="loading">scanning…</div></div>
+    </div>
+  </div>
+
+  <!-- Row 5: Health -->
+  <div class="card">
+    <div class="corner-accent-tl"></div>
+    <div class="corner-accent"></div>
+    <div class="card-header">
+      <span class="card-title">HEALTH CHECKS</span>
+      <span id="healthSummary"></span>
+      <span class="card-age" id="healthAge"></span>
+    </div>
+    <div id="healthBody"><div class="loading">scanning…</div></div>
+  </div>
+
+  <!-- Row 6: Logs -->
+  <div class="card">
+    <div class="corner-accent-tl"></div>
+    <div class="corner-accent"></div>
+    <div class="card-header">
+      <span class="card-title">CONTAINER LOGS</span>
+      <span class="card-age" id="logsAge"></span>
+    </div>
+    <div class="log-box" id="logBox"><div class="loading">scanning…</div></div>
+  </div>
+
+  <!-- Row 7: On-Demand -->
+  <div class="card">
+    <div class="corner-accent-tl"></div>
+    <div class="corner-accent"></div>
+    <div class="card-header"><span class="card-title">ON-DEMAND TOOLS</span></div>
+    <div class="controls-row">
+      <button class="btn" id="iranTestBtn" onclick="runIranTest()">⚡ IRAN TEST (PING/TRACEROUTE)</button>
+      <button class="btn" id="networkStatsBtn" onclick="runNetworkStats()">◈ PSIPHON NETWORK STATS</button>
+      <button class="btn" id="iranStatusBtn" onclick="refreshIranStatus()">↺ REFRESH IRAN STATUS</button>
+    </div>
+    <div class="output-area" id="onDemandOutput"></div>
+  </div>
+
+</main>
+
+<script>
+const BASE = '';
+let lastRefresh = null;
+let cycle = 0;
+
+async function api(endpoint, force = false) {
+  const method = force ? 'POST' : 'GET';
+  const res = await fetch(`${BASE}/api/${endpoint}`, { method });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+function ago(sec) {
+  if (sec < 5)  return 'live';
+  if (sec < 60) return `${sec}s ago`;
+  return `${Math.round(sec/60)}m ago`;
+}
+
+function speedColor(s) {
+  if (!s || s === '0 B/s') return 'dim';
+  return 'green';
+}
+
+function isIran(c) { return c.toLowerCase().includes('iran'); }
+
+function escHtml(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function formatBytes(bytes) {
+  if (!bytes) return '0 B';
+  const u = ['B','KB','MB','GB','TB'];
+  let i = 0, v = bytes;
+  while (v >= 1024 && i < u.length-1) { v /= 1024; i++; }
+  return `${v.toFixed(2)} ${u[i]}`;
+}
+
+function peerTable(rows) {
+  if (!rows?.length) return '<div class="loading">no data</div>';
+  return `<table class="data-table">
+    <thead><tr><th>COUNTRY</th><th>TOTAL</th><th>SPEED</th><th>CLIENTS</th></tr></thead>
+    <tbody>${rows.map(r => {
+      const iran = isIran(r.country);
+      const cls  = iran ? 'iran-row' : '';
+      return `<tr class="${cls}">
+        <td>${escHtml(r.country)}</td>
+        <td class="cyan">${r.total}</td>
+        <td class="${speedColor(r.speed)}">${r.speed}</td>
+        <td class="${r.clients > 0 ? 'green' : 'dim'}">${r.clients}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
+}
+
+// ── Renderers ──────────────────────────────────────────────────────────────
+
+function renderStatus(d) {
+  const running = d.status === 'running';
+  updateToggleBtn(running);
+  const badge = document.getElementById('globalBadge');
+  badge.className = `status-badge ${running ? 'running' : 'stopped'}`;
+  document.getElementById('pulseDot').className = `pulse ${running ? 'green' : 'red'}`;
+  document.getElementById('statusText').textContent = running
+    ? `ONLINE  [${d.containers?.running}/${d.containers?.total}]`
+    : 'OFFLINE';
+
+  document.getElementById('nodeCard').innerHTML = `
+    <div class="corner-accent-tl"></div><div class="corner-accent"></div>
+    <div class="card-header"><span class="card-title">NODE STATUS</span>
+      <span class="card-age">${d._cached ? ago(d._age) : 'live'}</span></div>
+    <div class="stat-row">
+      <div class="stat-item"><span class="stat-label">Status</span>
+        <span class="badge ${running ? 'badge-green' : 'badge-red'}">${d.status?.toUpperCase()}</span></div>
+      <div class="stat-item"><span class="stat-label">Containers</span>
+        <span class="stat-val ${running ? 'green' : 'red'}">${d.containers?.running}/${d.containers?.total}</span></div>
+      <div class="stat-item"><span class="stat-label">Uptime</span>
+        <span class="stat-val cyan">${d.uptime || '–'}</span></div>
+      <div class="stat-item"><span class="stat-label">Restarts</span>
+        <span class="stat-val ${d.restarts > 0 ? 'yellow' : 'green'}">${d.restarts}</span></div>
+      <div class="stat-item"><span class="stat-label">Peers Connected</span>
+        <span class="stat-val ${d.peers?.connected > 0 ? 'green' : 'dim'}">${d.peers?.connected ?? 0}</span></div>
+      <div class="stat-item"><span class="stat-label">Version</span>
+        <span class="stat-val dim">${d.version}</span></div>
+    </div>`;
+
+  const ramPct = d.sys_ram_used && d.sys_ram_total
+    ? Math.round(parseFloat(d.sys_ram_used)/parseFloat(d.sys_ram_total)*100) : null;
+  document.getElementById('sysCard').innerHTML = `
+    <div class="corner-accent-tl"></div><div class="corner-accent"></div>
+    <div class="card-header"><span class="card-title">SYSTEM RESOURCES</span></div>
+    <div class="stat-row">
+      <div class="stat-item"><span class="stat-label">CPU (System)</span>
+        <span class="stat-val green">${d.sys_cpu || '–'}</span></div>
+      <div class="stat-item"><span class="stat-label">CPU (App)</span>
+        <span class="stat-val green">${d.app_cpu || '–'}</span></div>
+      <div class="stat-item"><span class="stat-label">RAM System</span>
+        <span class="stat-val">${d.sys_ram_used} / ${d.sys_ram_total}</span></div>
+      <div class="stat-item"><span class="stat-label">RAM App</span>
+        <span class="stat-val dim">${d.app_ram || '–'}</span></div>
+      <div class="stat-item"><span class="stat-label">Temperature</span>
+        <span class="stat-val ${parseFloat(d.sys_temp) > 70 ? 'red' : 'green'}">${d.sys_temp || '–'}</span></div>
+      <div class="stat-item"><span class="stat-label">Host</span>
+        <span class="stat-val dim">${d.hostname}</span></div>
+    </div>`;
+
+  document.getElementById('trafficCard').innerHTML = `
+    <div class="corner-accent-tl"></div><div class="corner-accent"></div>
+    <div class="card-header"><span class="card-title">TRAFFIC STATS</span></div>
+    <div class="stat-row">
+      <div class="stat-item"><span class="stat-label">Data Served (Total)</span>
+        <span class="stat-val cyan">${d.data_served_human || '–'}</span></div>
+      <div class="stat-item"><span class="stat-label">Upload (Session)</span>
+        <span class="stat-val green">${d.bandwidth?.upload_human || '–'}</span></div>
+      <div class="stat-item"><span class="stat-label">Download (Session)</span>
+        <span class="stat-val green">${d.bandwidth?.download_human || '–'}</span></div>
+      <div class="stat-item"><span class="stat-label">Unique IPs (Lifetime)</span>
+        <span class="stat-val cyan">${(d.unique_ips||0).toLocaleString()}</span></div>
+      <div class="stat-item"><span class="stat-label">Tracker In</span>
+        <span class="stat-val dim">${formatBytes(d.tracker_in_bytes)}</span></div>
+      <div class="stat-item"><span class="stat-label">Tracker Out</span>
+        <span class="stat-val dim">${formatBytes(d.tracker_out_bytes)}</span></div>
+    </div>`;
+
+  document.getElementById('settingsCard').innerHTML = `
+    <div class="corner-accent-tl"></div><div class="corner-accent"></div>
+    <div class="card-header"><span class="card-title">SETTINGS</span></div>
+    <div class="stat-row">
+      <div class="stat-item"><span class="stat-label">Max Clients</span>
+        <span class="stat-val cyan">${d.settings?.max_clients}</span></div>
+      <div class="stat-item"><span class="stat-label">Bandwidth Cap</span>
+        <span class="stat-val">${d.settings?.bandwidth} Mbps</span></div>
+      <div class="stat-item"><span class="stat-label">Containers</span>
+        <span class="stat-val">${d.settings?.container_count}</span></div>
+      <div class="stat-item"><span class="stat-label">Client Mode</span>
+        <span class="badge badge-cyan">${d.settings?.client_mode}</span></div>
+      <div class="stat-item"><span class="stat-label">Snowflake</span>
+        <span class="stat-val ${d.snowflake?.enabled ? 'green' : 'dim'}">${d.snowflake?.enabled ? '✓ ENABLED' : '✗ DISABLED'}</span></div>
+      <div class="stat-item"><span class="stat-label">Data Cap</span>
+        <span class="stat-val dim">${d.settings?.data_cap_gb > 0 ? d.settings.data_cap_gb+' GB' : 'NONE'}</span></div>
+    </div>`;
+}
+
+function renderContainers(d) {
+  const list = (d.containers || []).filter(c => !c.Names.includes('openclaw-sbd-agent'));
+  document.getElementById('containersAge').textContent = d._cached ? ago(d._age) : 'live';
+  if (!list.length) { document.getElementById('containersBody').innerHTML = '<div class="error-text">no containers found</div>'; return; }
+  const html = `<div class="grid-2" style="gap:10px">` +
+    list.map(c => {
+      const run = c.State === 'running';
+      return `<div class="container-card">
+        <div class="container-name">${escHtml(c.Names)}</div>
+        <div class="stat-row">
+          <div class="stat-item"><span class="stat-label">State</span>
+            <span class="badge ${run ? 'badge-green' : 'badge-red'}">${c.State?.toUpperCase()}</span></div>
+          <div class="stat-item"><span class="stat-label">Status</span>
+            <span class="stat-val dim" style="font-size:10px">${escHtml(c.Status)}</span></div>
+          <div class="stat-item"><span class="stat-label">Image</span>
+            <span class="stat-val dim" style="font-size:10px">${escHtml(c.Image?.split('/').pop()||c.Image)}</span></div>
+          <div class="stat-item"><span class="stat-label">Running For</span>
+            <span class="stat-val dim">${escHtml(c.RunningFor)}</span></div>
+          <div class="stat-item"><span class="stat-label">Network</span>
+            <span class="stat-val cyan">${escHtml(c.Networks)}</span></div>
+        </div>
+      </div>`;
+    }).join('') + '</div>';
+  document.getElementById('containersBody').innerHTML = html;
+}
+
+function renderPeers(d) {
+  document.getElementById('peersAge').textContent = (d._cached ? ago(d._age) : 'live') + (d.lastUpdate ? ` · ${d.lastUpdate}` : '');
+  document.getElementById('inboundBody').innerHTML  = peerTable(d.inbound);
+  document.getElementById('outboundBody').innerHTML = peerTable(d.outbound);
+
+  const iranIn  = (d.inbound  || []).filter(r => isIran(r.country));
+  const iranOut = (d.outbound || []).filter(r => isIran(r.country));
+  const activeIn  = iranIn.reduce((s,r) => s + r.clients, 0);
+  const activeOut = iranOut.reduce((s,r) => s + r.clients, 0);
+
+  let html = `<div class="stat-row" style="margin-bottom:12px">
+    <div class="stat-item"><span class="stat-label">Live Inbound Clients</span>
+      <span class="stat-val ${activeIn > 0 ? 'orange' : 'dim'}">${activeIn > 0 ? '◉ '+activeIn+' ACTIVE' : '○ NONE'}</span></div>
+    <div class="stat-item"><span class="stat-label">Live Outbound Clients</span>
+      <span class="stat-val ${activeOut > 0 ? 'orange' : 'dim'}">${activeOut > 0 ? '◉ '+activeOut+' ACTIVE' : '○ NONE'}</span></div>
+  </div>`;
+  if (iranIn.length)  html += `<div class="section-label">INBOUND</div>${peerTable(iranIn)}`;
+  if (iranOut.length) html += `<div class="section-label" style="margin-top:10px">OUTBOUND</div>${peerTable(iranOut)}`;
+  if (!iranIn.length && !iranOut.length) html += '<div class="loading">no iran traffic logged yet</div>';
+  document.getElementById('iranPeersBody').innerHTML = html;
+}
+
+function renderHealth(d) {
+  document.getElementById('healthAge').textContent = d._cached ? ago(d._age) : 'live';
+  document.getElementById('healthSummary').innerHTML = d.allPassed
+    ? '<span class="badge badge-green">✓ ALL SYSTEMS GO</span>'
+    : '<span class="badge badge-red">⚠ ISSUES DETECTED</span>';
+  if (!d.checks?.length) { document.getElementById('healthBody').innerHTML = '<div class="loading">no data</div>'; return; }
+
+  const grouped = {};
+  for (const c of d.checks) (grouped[c.container] = grouped[c.container]||[]).push(c);
+
+  let html = '';
+  for (const [container, checks] of Object.entries(grouped)) {
+    html += `<div class="health-container-header">${escHtml(container)}</div><div class="health-grid">`;
+    for (const c of checks) {
+      const col = c.status === 'OK' ? 'var(--green)' : c.status === 'FAIL' ? 'var(--red)' : 'var(--yellow)';
+      html += `<div class="health-item">
+        <div class="health-dot" style="background:${col};box-shadow:0 0 5px ${col}"></div>
+        <div><div class="health-label">${escHtml(c.label)}</div>
+          <div class="health-detail">${escHtml(c.detail||c.status)}</div></div>
+      </div>`;
+    }
+    html += '</div>';
+  }
+  document.getElementById('healthBody').innerHTML = html;
+}
+
+function renderLogs(d) {
+  document.getElementById('logsAge').textContent = `${d.lines?.length||0} lines`;
+  const box = document.getElementById('logBox');
+  const wasBottom = box.scrollHeight - box.scrollTop <= box.clientHeight + 30;
+  box.innerHTML = (d.lines||[]).map(l => `<div class="log-line">${escHtml(l)}</div>`).join('');
+  if (wasBottom) box.scrollTop = box.scrollHeight;
+}
+
+function renderIranStatus(d) {
+  document.getElementById('iranStatusAge').textContent = d._cached ? ago(d._age) : 'live';
+  const pct   = d.bgpReachability;
+  const color = pct >= 95 ? 'var(--green)' : pct >= 80 ? 'var(--yellow)' : 'var(--red)';
+  let html = '';
+  if (pct !== null) {
+    html += `<div class="bgp-gauge">
+      <div class="gauge-pct" style="color:${color};text-shadow:0 0 12px ${color}">${pct}%</div>
+      <div style="flex:1">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--dim2);margin-bottom:5px;letter-spacing:.08em">BGP REACHABILITY  (IODA)</div>
+        <div class="gauge-bar"><div class="gauge-fill" style="width:${pct}%;background:${color}"></div></div>
+      </div>
+    </div>`;
+  }
+  html += `<div class="stat-item" style="margin-top:12px">
+    <span class="stat-label">Outages (7 days)</span>
+    <span class="badge ${d.noOutages ? 'badge-green' : 'badge-red'}">${d.noOutages ? '✓ NONE DETECTED' : '⚠ OUTAGES FOUND'}</span>
+  </div>`;
+  if (d.raw) {
+    html += `<details style="margin-top:12px">
+      <summary>FULL REPORT ▾</summary>
+      <div class="raw-box" style="margin-top:8px">${escHtml(d.raw)}</div>
+    </details>`;
+  }
+  document.getElementById('iranStatusBody').innerHTML = html;
+}
+
+// ── Fetchers ───────────────────────────────────────────────────────────────
+async function fetchStatus(f=false)     { try { renderStatus(await api('status',f)); }      catch(e){console.error(e);} }
+async function fetchPeers(f=false)      { try { renderPeers(await api('peers',f)); }        catch(e){console.error(e);} }
+async function fetchHealth(f=false)     { try { renderHealth(await api('health',f)); }      catch(e){console.error(e);} }
+async function fetchLogs(f=false)       { try { renderLogs(await api('logs',f)); }          catch(e){console.error(e);} }
+async function fetchContainers(f=false) { try { renderContainers(await api('containers',f)); } catch(e){console.error(e);} }
+async function fetchIranStatus(f=false) { try { renderIranStatus(await api('iran-status',f)); } catch(e){console.error(e);} }
+
+// ── On-demand ──────────────────────────────────────────────────────────────
+async function runIranTest() {
+  const btn = document.getElementById('iranTestBtn');
+  const out = document.getElementById('onDemandOutput');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>RUNNING IRAN TEST (UP TO 90s)…';
+  out.innerHTML = '';
+  try {
+    const d = await api('iran-test', true);
+    out.innerHTML = `<div class="section-label">IRAN TEST · ${new Date(d.ts).toLocaleTimeString()}</div>
+      <div class="raw-box">${escHtml(d.raw)}</div>`;
+  } catch(e) { out.innerHTML = `<div class="error-text">ERROR: ${e.message}</div>`; }
+  btn.disabled = false;
+  btn.textContent = '⚡ IRAN TEST (PING/TRACEROUTE)';
+}
+
+async function runNetworkStats() {
+  const btn = document.getElementById('networkStatsBtn');
+  const out = document.getElementById('onDemandOutput');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>FETCHING NETWORK STATS…';
+  out.innerHTML = '';
+  try {
+    const d = await api('network-stats', true);
+    out.innerHTML = `<div class="section-label">PSIPHON NETWORK STATS · ${new Date(d.ts).toLocaleTimeString()}</div>
+      <div class="raw-box">${escHtml(d.raw)}</div>`;
+  } catch(e) { out.innerHTML = `<div class="error-text">ERROR: ${e.message}</div>`; }
+  btn.disabled = false;
+  btn.textContent = '◈ PSIPHON NETWORK STATS';
+}
+
+async function refreshIranStatus() {
+  const btn = document.getElementById('iranStatusBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>REFRESHING…';
+  await fetchIranStatus(true);
+  btn.disabled = false;
+  btn.textContent = '↺ REFRESH IRAN STATUS';
+}
+
+// ── Conduit power toggle ───────────────────────────────────────────────────
+let conduitRunning = null;
+
+function updateToggleBtn(running) {
+  conduitRunning = running;
+  const btn = document.getElementById('toggleBtn');
+  const lbl = document.getElementById('toggleStatus');
+  if (running) {
+    btn.className = 'btn danger';
+    btn.textContent = '⏻ STOP NODES';
+    if (lbl) lbl.innerHTML = '<span class="green">● NODES ONLINE</span>';
+  } else {
+    btn.className = 'btn primary';
+    btn.textContent = '⏻ START NODES';
+    if (lbl) lbl.innerHTML = '<span class="red">● NODES OFFLINE</span>';
+  }
+  btn.disabled = false;
+}
+
+async function toggleConduit() {
+  const btn = document.getElementById('toggleBtn');
+  const lbl = document.getElementById('toggleStatus');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>' + (conduitRunning ? 'STOPPING…' : 'STARTING…');
+  if (lbl) lbl.innerHTML = '<span class="dim">working…</span>';
+  try {
+    const d = await api('conduit-toggle', true);
+    updateToggleBtn(d.running);
+    await fetchStatus(true);
+  } catch(e) {
+    if (lbl) lbl.innerHTML = `<span class="error-text">ERROR: ${e.message}</span>`;
+    btn.disabled = false;
+  }
+}
+
+// ── Tehran clock + weather ─────────────────────────────────────────────────
+function updateTehranClock() {
+  const now  = new Date();
+  const time = now.toLocaleTimeString('en-US', { timeZone:'Asia/Tehran', hour12:false, hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  const date = now.toLocaleDateString('en-US', { timeZone:'Asia/Tehran', weekday:'long', year:'numeric', month:'short', day:'numeric' });
+  const te = document.getElementById('tehranTime');
+  const de = document.getElementById('tehranDate');
+  if (te) te.textContent = time;
+  if (de) de.textContent = date.toUpperCase();
+}
+
+const WMO = {
+  0:'☀ CLEAR', 1:'🌤 MAINLY CLEAR', 2:'⛅ PARTLY CLOUDY', 3:'☁ OVERCAST',
+  45:'🌫 FOG', 48:'🌫 ICING FOG',
+  51:'🌦 LIGHT DRIZZLE', 53:'🌦 DRIZZLE', 55:'🌧 HEAVY DRIZZLE',
+  61:'🌧 LIGHT RAIN', 63:'🌧 RAIN', 65:'🌧 HEAVY RAIN',
+  71:'🌨 LIGHT SNOW', 73:'🌨 SNOW', 75:'❄ HEAVY SNOW',
+  80:'🌦 LIGHT SHOWERS', 81:'🌧 SHOWERS', 82:'⛈ HEAVY SHOWERS',
+  95:'⛈ THUNDERSTORM', 96:'⛈ HAIL STORM', 99:'⛈ HEAVY HAIL',
+};
+
+async function fetchTehranWeather() {
+  try {
+    const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=35.6892&longitude=51.3890&current=temperature_2m,weathercode,windspeed_10m,relative_humidity_2m&timezone=Asia/Tehran');
+    const d   = await res.json();
+    const c   = d.current;
+    const raw = WMO[c.weathercode] || `CODE ${c.weathercode}`;
+    const icon = raw.split(' ')[0];
+    const desc = raw.replace(/^\S+\s*/, '');
+    document.getElementById('tehranWeather').innerHTML = `
+      <div style="display:flex;gap:18px;align-items:center">
+        <div style="text-align:center;flex-shrink:0">
+          <div style="font-size:26px;line-height:1.1">${icon}</div>
+          <div style="font-family:'Orbitron',monospace;font-size:17px;font-weight:700;color:var(--orange);text-shadow:0 0 10px rgba(255,140,0,0.5)">${c.temperature_2m}°C</div>
+        </div>
+        <div class="stat-row" style="gap:3px">
+          <div class="stat-item"><span class="stat-label" style="font-size:11px">CONDITIONS</span><span class="stat-val cyan" style="font-size:10px">${desc}</span></div>
+          <div class="stat-item"><span class="stat-label" style="font-size:11px">WIND</span><span class="stat-val" style="font-size:10px">${c.windspeed_10m} KM/H</span></div>
+          <div class="stat-item"><span class="stat-label" style="font-size:11px">HUMIDITY</span><span class="stat-val" style="font-size:10px">${c.relative_humidity_2m}%</span></div>
+        </div>
+      </div>`;
+  } catch(e) {
+    const el = document.getElementById('tehranWeather');
+    if (el) el.innerHTML = '<span class="error-text">weather unavailable</span>';
+  }
+}
+
+setInterval(updateTehranClock, 1000);
+updateTehranClock();
+fetchTehranWeather();
+setInterval(fetchTehranWeather, 600000); // refresh every 10 min
+
+// ── Main loop ──────────────────────────────────────────────────────────────
+function updateRefreshInfo() {
+  if (!lastRefresh) return;
+  const s = Math.round((Date.now() - lastRefresh) / 1000);
+  document.getElementById('refreshInfo').textContent = `SYNCED ${ago(s)} · AUTO 30s`;
+}
+
+async function refreshAll(force=true) {
+  document.getElementById('refreshInfo').textContent = 'SYNCING…';
+  await Promise.all([fetchStatus(force), fetchPeers(force), fetchContainers(force), fetchLogs(force)]);
+  if (force || cycle % 2 === 0) await fetchHealth(force);
+  if (force || cycle % 4 === 0) await fetchIranStatus(force);
+  cycle++;
+  lastRefresh = new Date();
+  updateRefreshInfo();
+}
+
+refreshAll(false);
+setInterval(() => refreshAll(false), 30000);
+setInterval(updateRefreshInfo, 5000);
+</script>
+</body>
+</html>
